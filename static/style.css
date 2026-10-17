@@ -1,0 +1,177 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* --- LIGHT THEME (DEFAULT / CRYSTALDISKINFO STYLE) --- */
+:root {
+  --bg-main: #F3F4F6;
+  --bg-header: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-subtle: #F8FAFC;
+  --border-card: #E2E8F0;
+  --border-subtle: #CBD5E1;
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+  --text-light: #94A3B8;
+  --table-head: #F1F5F9;
+  --table-border: #E2E8F0;
+  --table-hover: #F8FAFC;
+
+  /* CDI Accents */
+  --cdi-blue: #2563EB;
+  --cdi-blue-light: #3B82F6;
+  --cdi-blue-gradient: linear-gradient(180deg, #60A5FA 0%, #2563EB 60%, #1D4ED8 100%);
+  --cdi-amber-gradient: linear-gradient(180deg, #FBBF24 0%, #F59E0B 60%, #D97706 100%);
+  --cdi-rose-gradient: linear-gradient(180deg, #F87171 0%, #EF4444 60%, #DC2626 100%);
+}
+
+/* --- DARK THEME OVERRIDE --- */
+body.dark-theme {
+  --bg-main: #0B0F19;
+  --bg-header: #111827;
+  --bg-card: #111827;
+  --bg-card-subtle: #162032;
+  --border-card: #1F293D;
+  --border-subtle: #334155;
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --text-light: #64748B;
+  --table-head: #0F172A;
+  --table-border: #1E293B;
+  --table-hover: #162032;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+}
+
+/* Header & Panels */
+.app-header {
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-card);
+}
+
+.app-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.app-card-subtle {
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-card);
+}
+
+/* CDI Iconic Health Button / Badge */
+.cdi-health-badge {
+  background: var(--cdi-blue-gradient);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.cdi-health-badge-amber {
+  background: var(--cdi-amber-gradient);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.cdi-health-badge-rose {
+  background: var(--cdi-rose-gradient);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Temperature Pill Button */
+.cdi-temp-badge {
+  background: linear-gradient(180deg, #93C5FD 0%, #3B82F6 100%);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px 0 rgba(59, 130, 246, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* CDI 3D Glowing Status Spheres (S.M.A.R.T dots) */
+.cdi-dot-blue {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #93C5FD, #2563EB 70%, #1E40AF 100%);
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.6);
+  display: inline-block;
+}
+
+.cdi-dot-amber {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #FDE68A, #F59E0B 70%, #B45309 100%);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+  display: inline-block;
+}
+
+.cdi-dot-rose {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #FCA5A5, #EF4444 70%, #991B1B 100%);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+  display: inline-block;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+body.dark-theme ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Shimmer animation for masking banner */
+.shimmer-banner-light {
+  background: linear-gradient(90deg, #FEF3C7 0%, #FEE2E2 50%, #FEF3C7 100%);
+  background-size: 200% 100%;
+  animation: shimmer 5s infinite linear;
+}
+
+body.dark-theme .shimmer-banner-light {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(244, 63, 94, 0.2) 50%, rgba(245, 158, 11, 0.15) 100%);
+  background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Tooltip Styling */
+#capacity-tooltip {
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+}
+#capacity-container:hover #capacity-tooltip {
+  opacity: 1;
+  transform: translate(-50%, -6px);
+}
+
