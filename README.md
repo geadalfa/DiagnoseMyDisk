@@ -2,10 +2,12 @@
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-blue.svg)](https://microsoft.com/windows)
-[![Architecture](https://img.shields.io/badge/Architecture-x64-indigo.svg)]()
-[![Status](https://img.shields.io/badge/Status-Stable%20v1.2-emerald.svg)]()
+[![Release](https://img.shields.io/badge/Release-v1.2.0-emerald.svg)](https://github.com/geadalfa/DiagnoseMyDisk/releases/tag/v1.2.0)
+[![Direct Download](https://img.shields.io/badge/Download-DiagnoseMyDisk__Setup.exe-2563EB?style=flat&logo=windows)](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v1.2.0/DiagnoseMyDisk_Setup.exe)
 
 > **DiagnoseMyDisk** is a modern, transparent Windows storage health inspector and deep S.M.A.R.T telemetry diagnostic tool. It eliminates firmware reporting discrepancies, reveals the true endurance of SATA and NVMe SSDs, and presents actionable health insights through intuitive dual perspectives: **Standard Mode** for everyday users and **Technician Mode** for hardware specialists.
+
+### 📥 [Download Official Windows Setup (v1.2.0)](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v1.2.0/DiagnoseMyDisk_Setup.exe) (~6.6 MB - Zero dependencies)
 
 ---
 
