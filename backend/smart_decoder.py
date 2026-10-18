@@ -312,9 +312,10 @@ NVME_SMART_NAMES = {
 }
 
 
-def decode_ata_smart_table(raw_bytes_list):
+def decode_ata_smart_table(raw_bytes_list, thresh_bytes_or_dict=None):
     """
     Mendecode blok SMART ATA 512-byte (MSStorageDriver_ATAPISmartData.VendorSpecific)
+    dan mengaitkan nilai ambang batas (Threshold) jika tersedia.
     Struktur tiap atribut: 12 byte (dimulai offset 2)
     Byte 0: ID
     Byte 1-2: Status Flags
@@ -325,6 +326,15 @@ def decode_ata_smart_table(raw_bytes_list):
     attributes = []
     if not raw_bytes_list or len(raw_bytes_list) < 362:
         return attributes
+
+    thresholds = {}
+    if isinstance(thresh_bytes_or_dict, (list, bytes, tuple)) and len(thresh_bytes_or_dict) >= 362:
+        for ti in range(2, min(len(thresh_bytes_or_dict), 362), 12):
+            taid = thresh_bytes_or_dict[ti]
+            if taid > 0:
+                thresholds[taid] = thresh_bytes_or_dict[ti + 1]
+    elif isinstance(thresh_bytes_or_dict, dict):
+        thresholds = thresh_bytes_or_dict
 
     for i in range(2, 362, 12):
         attr_id = raw_bytes_list[i]
@@ -352,6 +362,7 @@ def decode_ata_smart_table(raw_bytes_list):
             "desc_en": attr_meta["desc_en"],
             "current": current_val,
             "worst": worst_val,
+            "threshold": thresholds.get(attr_id, 0),
             "raw_int": raw_val,
             "raw_hex": f"0x{raw_val:012X}",
         })

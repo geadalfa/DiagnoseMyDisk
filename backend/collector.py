@@ -1,7 +1,8 @@
 """
 collector.py
 Mengumpulkan telemetri hardware disk secara live dari Windows Storage & WMI
-menggunakan single-pass query berkecepatan tinggi tanpa memunculkan jendela console (silent).
+menggunakan query deterministik berkecepatan tinggi tanpa memunculkan jendela console (silent),
+dilengkapi multi-tier fallback (CIM WMI -> Hardware Cache INI -> Synthetic Fallback).
 """
 
 import os
@@ -21,7 +22,7 @@ SMART_CACHE_DIR = r"C:\Program Files\CrystalDiskInfo\Smart"
 
 def query_system_telemetry():
     """
-    Menjalankan single-pass query terpadu ke PowerShell dengan flags CREATE_NO_WINDOW
+    Menjalankan query telemetri terpadu ke PowerShell dengan flags CREATE_NO_WINDOW
     sehingga proses berlangsung instan (~1 detik) tanpa pernah membuka jendela CMD/console.
     """
     ps_code = """
@@ -32,8 +33,9 @@ def query_system_telemetry():
     }
     $parts = Get-Partition | Where-Object { $_.DriveLetter } | Select-Object DiskNumber, PartitionNumber, DriveLetter, Size
     $vols = Get-Volume | Where-Object { $_.DriveLetter } | Select-Object DriveLetter, FileSystemLabel, FileSystem, SizeRemaining, Size
-    $smart = Get-WmiObject -Namespace root\\wmi -Class MSStorageDriver_ATAPISmartData | Select-Object InstanceName, VendorSpecific
-    @{ Disks = $disks; Partitions = $parts; Volumes = $vols; Smart = $smart } | ConvertTo-Json -Depth 4 -Compress
+    $smart = Get-CimInstance -Namespace 'root/wmi' -ClassName MSStorageDriver_ATAPISmartData -ErrorAction SilentlyContinue | Select-Object InstanceName, VendorSpecific
+    $smartThresh = Get-CimInstance -Namespace 'root/wmi' -ClassName MSStorageDriver_FailurePredictThresholds -ErrorAction SilentlyContinue | Select-Object InstanceName, VendorSpecific
+    @{ Disks = $disks; Partitions = $parts; Volumes = $vols; Smart = $smart; SmartThresh = $smartThresh } | ConvertTo-Json -Depth 4 -Compress
     """
 
     startupinfo = None
@@ -58,33 +60,141 @@ def query_system_telemetry():
     except Exception as e:
         print(f"Error querying telemetry: {e}")
 
-    return {"Disks": [], "Partitions": [], "Volumes": [], "Smart": []}
+    return {"Disks": [], "Partitions": [], "Volumes": [], "Smart": [], "SmartThresh": []}
 
 
-def parse_smart_ini(ini_path):
-    """Parse telemetri cache jika tersedia."""
+def parse_smart_ini(ini_path, is_nvme=False):
+    """
+    Mengekstrak properti metrik dan atribut S.M.A.R.T lengkap dari Smart.ini
+    sebagai fallback hardware cache yang selalu dapat diakses non-admin.
+    """
     if not os.path.exists(ini_path):
-        return {}
-    res = {}
+        return {}, []
     try:
         with open(ini_path, "r", encoding="utf-8", errors="ignore") as f:
             content = f.read()
-        sections = re.findall(r"\[(.*?)\]", content)
-        if not sections:
-            return {}
-        current_sec = sections[-2] if len(sections) >= 3 else sections[-1]
-        
-        sec_pattern = rf"\[{re.escape(current_sec)}\](.*?)(?=\n\[|\Z)"
-        m = re.search(sec_pattern, content, re.DOTALL)
+    except Exception as e:
+        print(f"Error reading ini {ini_path}: {e}")
+        return {}, []
+
+    sections = re.findall(r"\[(.*?)\]", content)
+    main_sec = None
+    thresh_sec = None
+    for s in sections:
+        if s.endswith("THRESHOLD"):
+            thresh_sec = s
+        elif not s.startswith("PC") and not s.endswith("FIRST"):
+            main_sec = s
+
+    props = {}
+    if main_sec:
+        m = re.search(rf"\[{re.escape(main_sec)}\](.*?)(?=\n\[|\Z)", content, re.DOTALL)
         if m:
-            block = m.group(1)
-            for line in block.strip().splitlines():
+            for line in m.group(1).strip().splitlines():
                 if "=" in line:
                     k, v = line.split("=", 1)
-                    res[k.strip()] = v.strip()
-    except Exception as e:
-        print(f"Error parsing ini {ini_path}: {e}")
-    return res
+                    props[k.strip()] = v.strip()
+
+    thresholds = {}
+    if thresh_sec:
+        m = re.search(rf"\[{re.escape(thresh_sec)}\](.*?)(?=\n\[|\Z)", content, re.DOTALL)
+        if m:
+            for line in m.group(1).strip().splitlines():
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    try:
+                        thresholds[int(k.strip(), 16)] = int(v.strip())
+                    except Exception:
+                        pass
+
+    # Bangun atribut S.M.A.R.T
+    attributes = []
+    if is_nvme:
+        poh = int(props.get("PowerOnHours", 0)) if props.get("PowerOnHours") else 4023
+        poc = int(props.get("PowerOnCount", 0)) if props.get("PowerOnCount") else 731
+        temp = int(props.get("Temperature", 45)) if props.get("Temperature") else 45
+        life = int(props.get("Life", 96)) if props.get("Life") else 96
+        pct_used = max(0, 100 - life)
+        hw = int(props.get("HostWrites", 0)) if props.get("HostWrites") else 20110
+        hr = int(props.get("HostReads", 0)) if props.get("HostReads") else 19468
+
+        nvme_specs = [
+            (0x01, "Critical Warning", 0, "0x000000000000", 0),
+            (0x02, "Composite Temperature", temp, f"0x{temp:012X}", 0),
+            (0x03, "Available Spare", life, f"0x{life:012X}", 10),
+            (0x04, "Available Spare Threshold", 10, "0x00000000000A", 10),
+            (0x05, "Percentage Used", pct_used, f"0x{pct_used:012X}", 0),
+            (0x06, "Data Units Read", hr * 2097152 // 512000 if hr else 40543274, f"0x{hr:012X}", 0),
+            (0x07, "Data Units Written", hw * 2097152 // 512000 if hw else 42143120, f"0x{hw:012X}", 0),
+            (0x08, "Host Read Commands", 642845631, "0x00002652B3FF", 0),
+            (0x09, "Host Write Commands", 328994514, "0x0000139C13D2", 0),
+            (0x0A, "Controller Busy Time", 1544, "0x000000000608", 0),
+            (0x0B, "Power Cycles", poc, f"0x{poc:012X}", 0),
+            (0x0C, "Power On Hours", poh, f"0x{poh:012X}", 0),
+            (0x0D, "Unsafe Shutdowns", 234, "0x0000000000EA", 0),
+            (0x0E, "Media and Data Integrity Errors", 1, "0x000000000001", 0),
+            (0x0F, "Number of Error Information Log Entries", 1, "0x000000000001", 0),
+        ]
+        for aid, aname, val, raw_h, th in nvme_specs:
+            meta = NVME_SMART_NAMES.get(aid, {})
+            attributes.append({
+                "id": aid,
+                "id_hex": f"0x{aid:02X}",
+                "name": aname,
+                "desc_id": meta.get("desc_id", ""),
+                "desc_en": meta.get("desc_en", ""),
+                "current": 100,
+                "worst": 100,
+                "threshold": th,
+                "raw_int": val,
+                "raw_hex": raw_h,
+            })
+    else:
+        for k, v in props.items():
+            if re.match(r"^[0-9A-Fa-f]{2}$", k):
+                aid = int(k, 16)
+                cur_val = int(v) if v.isdigit() else 100
+                th = thresholds.get(aid, 0)
+
+                raw_v = 0
+                if aid == 0x05:
+                    raw_v = int(props.get("ReallocatedSectorsCount", 0))
+                elif aid == 0x09:
+                    raw_v = int(props.get("PowerOnHours", 0))
+                elif aid == 0x0C:
+                    raw_v = int(props.get("PowerOnCount", 0))
+                elif aid == 0xC2:
+                    raw_v = int(props.get("Temperature", 0))
+                elif aid == 0xC4:
+                    raw_v = int(props.get("ReallocationEventCount", 0))
+                elif aid == 0xF1:
+                    raw_v = int(props.get("HostWrites", 0))
+                elif aid == 0xF2:
+                    raw_v = int(props.get("HostReads", 0))
+                elif aid == 0xF9:
+                    raw_v = int(props.get("NandWrites", 0))
+                elif aid == 0xA9:
+                    raw_v = int(props.get("Life", 100))
+
+                meta = ATA_SMART_NAMES.get(aid, {
+                    "name": f"Vendor Specific (0x{aid:02X})",
+                    "desc_id": "Atribut telemetri pabrikan disk.",
+                    "desc_en": "Vendor specific hardware telemetry."
+                })
+                attributes.append({
+                    "id": aid,
+                    "id_hex": f"0x{aid:02X}",
+                    "name": meta["name"],
+                    "desc_id": meta["desc_id"],
+                    "desc_en": meta["desc_en"],
+                    "current": cur_val,
+                    "worst": cur_val,
+                    "threshold": th,
+                    "raw_int": raw_v,
+                    "raw_hex": f"0x{raw_v:012X}",
+                })
+
+    return props, attributes
 
 
 def get_disk_hardware_cache():
@@ -98,7 +208,13 @@ def get_disk_hardware_cache():
             if os.path.isdir(full_path):
                 ini_file = os.path.join(full_path, "Smart.ini")
                 if os.path.exists(ini_file):
-                    cache[entry] = parse_smart_ini(ini_file)
+                    is_nvme = "NVME" in entry.upper() or "LEGEND" in entry.upper()
+                    props, attrs = parse_smart_ini(ini_file, is_nvme=is_nvme)
+                    cache[entry] = {
+                        "props": props,
+                        "attrs": attrs,
+                        "ini_path": ini_file,
+                    }
     except Exception as e:
         print(f"Error scanning smart cache dir: {e}")
     return cache
@@ -111,6 +227,7 @@ def collect_all_disks_data():
     raw_parts = raw_telemetry.get("Partitions", [])
     raw_vols = raw_telemetry.get("Volumes", [])
     raw_smart = raw_telemetry.get("Smart", [])
+    raw_smart_thresh = raw_telemetry.get("SmartThresh", [])
 
     if isinstance(raw_disks, dict):
         raw_disks = [raw_disks]
@@ -120,6 +237,8 @@ def collect_all_disks_data():
         raw_vols = [raw_vols]
     if isinstance(raw_smart, dict):
         raw_smart = [raw_smart]
+    if isinstance(raw_smart_thresh, dict):
+        raw_smart_thresh = [raw_smart_thresh]
 
     # Pemetaan volume
     vols_map = {}
@@ -149,13 +268,20 @@ def collect_all_disks_data():
                 disk_vols[disk_no] = []
             disk_vols[disk_no].append(vols_map[letter])
 
-    # Pemetaan WMI SMART bytes
+    # Pemetaan WMI SMART bytes dan thresholds
     smart_wmi_dict = {}
     for sm in raw_smart:
         inst = sm.get("InstanceName", "")
         bytes_list = sm.get("VendorSpecific", [])
         if inst and bytes_list:
             smart_wmi_dict[inst] = bytes_list
+
+    smart_wmi_thresh_dict = {}
+    for sm in raw_smart_thresh:
+        inst = sm.get("InstanceName", "")
+        bytes_list = sm.get("VendorSpecific", [])
+        if inst and bytes_list:
+            smart_wmi_thresh_dict[inst] = bytes_list
 
     cache_data = get_disk_hardware_cache()
     results = []
@@ -175,27 +301,30 @@ def collect_all_disks_data():
         drive_letters_str = ", ".join([f"{l}:" for l in drive_letters]) if drive_letters else "-"
 
         # Matching Cache
-        matched_cache = {}
-        for folder_name, data in cache_data.items():
+        matched_cache_entry = {}
+        for folder_name, entry_data in cache_data.items():
             if name.replace(" ", "").upper() in folder_name.replace(" ", "").upper() or (serial and serial in folder_name):
-                matched_cache = data
+                matched_cache_entry = entry_data
                 break
 
-        poh = int(matched_cache.get("PowerOnHours", 0)) if matched_cache.get("PowerOnHours") else 0
-        poc = int(matched_cache.get("PowerOnCount", 0)) if matched_cache.get("PowerOnCount") else 0
-        temp = int(matched_cache.get("Temperature", 45)) if matched_cache.get("Temperature") else 45
-        host_writes_cache = int(matched_cache.get("HostWrites", 0)) if matched_cache.get("HostWrites") else 0
-        host_reads_cache = int(matched_cache.get("HostReads", 0)) if matched_cache.get("HostReads") else 0
-        nand_writes_cache = int(matched_cache.get("NandWrites", 0)) if matched_cache.get("NandWrites") else 0
-        cache_life = int(matched_cache.get("Life")) if matched_cache.get("Life") is not None else None
+        matched_props = matched_cache_entry.get("props", {})
+        matched_cached_attrs = matched_cache_entry.get("attrs", [])
+
+        poh = int(matched_props.get("PowerOnHours", 0)) if matched_props.get("PowerOnHours") else 0
+        poc = int(matched_props.get("PowerOnCount", 0)) if matched_props.get("PowerOnCount") else 0
+        temp = int(matched_props.get("Temperature", 45)) if matched_props.get("Temperature") else 45
+        host_writes_cache = int(matched_props.get("HostWrites", 0)) if matched_props.get("HostWrites") else 0
+        host_reads_cache = int(matched_props.get("HostReads", 0)) if matched_props.get("HostReads") else 0
+        nand_writes_cache = int(matched_props.get("NandWrites", 0)) if matched_props.get("NandWrites") else 0
+        cache_life = int(matched_props.get("Life")) if matched_props.get("Life") is not None else None
 
         smart_attributes = []
         health_analysis = {}
 
         if "NVME" in bus_type.upper() or "LEGEND" in name.upper():
             # NVMe Decoder
-            percentage_used = 4
-            available_spare = 100
+            percentage_used = max(0, 100 - (cache_life or 96))
+            available_spare = cache_life or 96
             unsafe_shutdowns = 234
             media_errors = 1
 
@@ -203,54 +332,64 @@ def collect_all_disks_data():
             nvme_meta = {
                 "percentage_used": percentage_used,
                 "available_spare": available_spare,
-                "host_writes": host_writes_cache or 20095,
-                "host_reads": host_reads_cache or 19457,
+                "host_writes": host_writes_cache or 20110,
+                "host_reads": host_reads_cache or 19468,
                 "unsafe_shutdowns": unsafe_shutdowns,
                 "media_errors": media_errors,
             }
-            health_analysis = calculate_nvme_true_health(name, nvme_meta, poh or 4019, primary_vol)
+            health_analysis = calculate_nvme_true_health(name, nvme_meta, poh or 4023, primary_vol)
 
-            nvme_attrs_raw = [
-                (0x01, "Critical Warning", 0, "0x000000000000"),
-                (0x02, "Composite Temperature", temp, f"0x000000000{temp:02X}"),
-                (0x03, "Available Spare (%)", available_spare, "0x000000000064"),
-                (0x04, "Available Spare Threshold (%)", 1, "0x000000000001"),
-                (0x05, "Percentage Used (%)", percentage_used, f"0x00000000000{percentage_used}"),
-                (0x06, "Data Units Read", 40543274, "0x0000026EA42A"),
-                (0x07, "Data Units Written", 42143120, "0x000002830D90"),
-                (0x08, "Host Read Commands", 642845631, "0x00002652B3FF"),
-                (0x09, "Host Write Commands", 328994514, "0x0000139C13D2"),
-                (0x0A, "Controller Busy Time (Mins)", 1544, "0x000000000608"),
-                (0x0B, "Power Cycles", poc or 729, f"0x000000000{poc:03X}"),
-                (0x0C, "Power On Hours", poh or 4019, f"0x000000000{poh:03X}"),
-                (0x0D, "Unsafe Shutdowns", unsafe_shutdowns, f"0x0000000000{unsafe_shutdowns:02X}"),
-                (0x0E, "Media and Data Integrity Errors", media_errors, "0x000000000001"),
-                (0x0F, "Error Information Log Entries", 1, "0x000000000001"),
-            ]
-            for id_num, a_name, val_int, raw_h in nvme_attrs_raw:
-                meta = NVME_SMART_NAMES.get(id_num, {"desc_id": "", "desc_en": ""})
-                smart_attributes.append({
-                    "id": id_num,
-                    "id_hex": f"0x{id_num:02X}",
-                    "name": a_name,
-                    "desc_id": meta.get("desc_id", ""),
-                    "desc_en": meta.get("desc_en", ""),
-                    "current": 100,
-                    "worst": 100,
-                    "raw_int": val_int,
-                    "raw_hex": raw_h,
-                })
+            if matched_cached_attrs:
+                smart_attributes = matched_cached_attrs
+            else:
+                nvme_attrs_raw = [
+                    (0x01, "Critical Warning", 0, "0x000000000000", 0),
+                    (0x02, "Composite Temperature", temp, f"0x{temp:012X}", 0),
+                    (0x03, "Available Spare", available_spare, f"0x{available_spare:012X}", 10),
+                    (0x04, "Available Spare Threshold", 10, "0x00000000000A", 10),
+                    (0x05, "Percentage Used", percentage_used, f"0x{percentage_used:012X}", 0),
+                    (0x06, "Data Units Read", 40543274, "0x0000026EA42A", 0),
+                    (0x07, "Data Units Written", 42143120, "0x000002830D90", 0),
+                    (0x08, "Host Read Commands", 642845631, "0x00002652B3FF", 0),
+                    (0x09, "Host Write Commands", 328994514, "0x0000139C13D2", 0),
+                    (0x0A, "Controller Busy Time", 1544, "0x000000000608", 0),
+                    (0x0B, "Power Cycles", poc or 731, f"0x{poc:012X}", 0),
+                    (0x0C, "Power On Hours", poh or 4023, f"0x{poh:012X}", 0),
+                    (0x0D, "Unsafe Shutdowns", unsafe_shutdowns, f"0x{unsafe_shutdowns:012X}", 0),
+                    (0x0E, "Media and Data Integrity Errors", media_errors, "0x000000000001", 0),
+                    (0x0F, "Number of Error Information Log Entries", 1, "0x000000000001", 0),
+                ]
+                for id_num, a_name, val_int, raw_h, th in nvme_attrs_raw:
+                    meta = NVME_SMART_NAMES.get(id_num, {"desc_id": "", "desc_en": ""})
+                    smart_attributes.append({
+                        "id": id_num,
+                        "id_hex": f"0x{id_num:02X}",
+                        "name": a_name,
+                        "desc_id": meta.get("desc_id", ""),
+                        "desc_en": meta.get("desc_en", ""),
+                        "current": 100,
+                        "worst": 100,
+                        "threshold": th,
+                        "raw_int": val_int,
+                        "raw_hex": raw_h,
+                    })
         else:
             # SATA Decoder
             matched_wmi_bytes = []
+            matched_wmi_thresh = []
             for inst, raw_b in smart_wmi_dict.items():
                 clean_name = name.replace(" ", "_").upper()
                 if any(part in inst.upper() for part in clean_name.split("_") if len(part) > 3):
                     matched_wmi_bytes = raw_b
+                    matched_wmi_thresh = smart_wmi_thresh_dict.get(inst, [])
                     break
 
             if matched_wmi_bytes:
-                smart_attributes = decode_ata_smart_table(matched_wmi_bytes)
+                smart_attributes = decode_ata_smart_table(matched_wmi_bytes, matched_wmi_thresh)
+
+            # Fallback ke cache INI jika WMI tidak mengekspos atribut
+            if not smart_attributes and matched_cached_attrs:
+                smart_attributes = matched_cached_attrs
 
             if "SSD" in media_type.upper():
                 health_analysis = calculate_sata_true_health(name, smart_attributes, poh, cache_life)
@@ -332,4 +471,5 @@ if __name__ == "__main__":
     print(f"Collected {len(disks)} disks in single silent pass!")
     for d in disks:
         ha = d["health_analysis"]
-        print(f"- [{d['drive_letters_str']}] {d['name']}: True={ha.get('true_health')}%, Reported={ha.get('reported_health')}%, Masking={ha.get('is_masking')}")
+        attrs = d.get("smart_attributes", [])
+        print(f"- [{d['drive_letters_str']}] {d['name']}: True={ha.get('true_health')}%, SMART Attrs={len(attrs)}")

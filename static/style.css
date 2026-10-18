@@ -1,162 +1,191 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-/* --- LIGHT THEME (DEFAULT / CRYSTALDISKINFO STYLE) --- */
+/* --- ZINC NEUTRAL DESIGN TOKENS --- */
 :root {
-  --bg-main: #F3F4F6;
-  --bg-header: #FFFFFF;
-  --bg-card: #FFFFFF;
-  --bg-card-subtle: #F8FAFC;
-  --border-card: #E2E8F0;
-  --border-subtle: #CBD5E1;
-  --text-main: #0F172A;
-  --text-muted: #64748B;
-  --text-light: #94A3B8;
-  --table-head: #F1F5F9;
-  --table-border: #E2E8F0;
-  --table-hover: #F8FAFC;
+  --bg-app: #F4F4F5;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #F8FAFC;
+  --bg-surface-hover: #F1F5F9;
+  --border-subtle: #E4E4E7;
+  --border-default: #D4D4D8;
+  --border-strong: #A1A1AA;
+  --text-primary: #09090B;
+  --text-secondary: #52525B;
+  --text-muted: #71717A;
+  --text-subtle: #A1A1AA;
 
-  /* CDI Accents */
-  --cdi-blue: #2563EB;
-  --cdi-blue-light: #3B82F6;
-  --cdi-blue-gradient: linear-gradient(180deg, #60A5FA 0%, #2563EB 60%, #1D4ED8 100%);
-  --cdi-amber-gradient: linear-gradient(180deg, #FBBF24 0%, #F59E0B 60%, #D97706 100%);
-  --cdi-rose-gradient: linear-gradient(180deg, #F87171 0%, #EF4444 60%, #DC2626 100%);
+  --accent-primary: #2563EB;
+  --accent-primary-hover: #1D4ED8;
+
+  --status-good-bg: #ECFDF5;
+  --status-good-border: #A7F3D0;
+  --status-good-text: #065F46;
+
+  --status-warn-bg: #FFFBEB;
+  --status-warn-border: #FDE68A;
+  --status-warn-text: #92400E;
+
+  --status-bad-bg: #FEF2F2;
+  --status-bad-border: #FECACA;
+  --status-bad-text: #991B1B;
 }
 
-/* --- DARK THEME OVERRIDE --- */
 body.dark-theme {
-  --bg-main: #0B0F19;
-  --bg-header: #111827;
-  --bg-card: #111827;
-  --bg-card-subtle: #162032;
-  --border-card: #1F293D;
-  --border-subtle: #334155;
-  --text-main: #F8FAFC;
-  --text-muted: #94A3B8;
-  --text-light: #64748B;
-  --table-head: #0F172A;
-  --table-border: #1E293B;
-  --table-hover: #162032;
+  --bg-app: #09090B;
+  --bg-surface: #121215;
+  --bg-surface-elevated: #18181B;
+  --bg-surface-hover: #202024;
+  --border-subtle: #27272A;
+  --border-default: #3F3F46;
+  --border-strong: #52525B;
+  --text-primary: #FAFAFA;
+  --text-secondary: #D4D4D8;
+  --text-muted: #A1A1AA;
+  --text-subtle: #71717A;
+
+  --accent-primary: #3B82F6;
+  --accent-primary-hover: #60A5FA;
+
+  --status-good-bg: rgba(16, 185, 129, 0.12);
+  --status-good-border: rgba(16, 185, 129, 0.3);
+  --status-good-text: #34D399;
+
+  --status-warn-bg: rgba(245, 158, 11, 0.12);
+  --status-warn-border: rgba(245, 158, 11, 0.3);
+  --status-warn-text: #FBBF24;
+
+  --status-bad-bg: rgba(239, 68, 68, 0.12);
+  --status-bad-border: rgba(239, 68, 68, 0.3);
+  --status-bad-text: #F87171;
 }
 
-body {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background-color: var(--bg-main);
-  color: var(--text-main);
+/* Base App Shell Reset */
+html, body {
+  height: 100%;
   margin: 0;
   padding: 0;
+  overflow: hidden;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Precision Typography & Numerical Stability */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 .font-mono {
   font-family: 'JetBrains Mono', Consolas, monospace;
 }
 
-/* Header & Panels */
-.app-header {
-  background: var(--bg-header);
-  border-bottom: 1px solid var(--border-card);
+/* Surface Cards & Containers */
+.app-surface {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.app-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease;
+.app-surface-elevated {
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
 }
 
-.app-card-subtle {
-  background: var(--bg-card-subtle);
-  border: 1px solid var(--border-card);
+/* Tab Card Styling */
+.disk-tab-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
 }
 
-/* CDI Iconic Health Button / Badge */
-.cdi-health-badge {
-  background: var(--cdi-blue-gradient);
+.disk-tab-card:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--border-default);
+}
+
+.disk-tab-card.active {
+  background-color: var(--bg-surface);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+/* Health Badge Pills */
+.health-badge-good {
+  background: linear-gradient(180deg, #10B981 0%, #059669 100%);
   color: #FFFFFF;
-  box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-.cdi-health-badge-amber {
-  background: var(--cdi-amber-gradient);
+.health-badge-caution {
+  background: linear-gradient(180deg, #F59E0B 0%, #D97706 100%);
   color: #FFFFFF;
-  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-.cdi-health-badge-rose {
-  background: var(--cdi-rose-gradient);
+.health-badge-bad {
+  background: linear-gradient(180deg, #EF4444 0%, #DC2626 100%);
   color: #FFFFFF;
-  box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-/* Temperature Pill Button */
-.cdi-temp-badge {
-  background: linear-gradient(180deg, #93C5FD 0%, #3B82F6 100%);
-  color: #FFFFFF;
-  box-shadow: 0 2px 8px 0 rgba(59, 130, 246, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-}
-
-/* CDI 3D Glowing Status Spheres (S.M.A.R.T dots) */
-.cdi-dot-blue {
-  width: 14px;
-  height: 14px;
+/* Status Spheres for SMART Table */
+.status-sphere-blue {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #93C5FD, #2563EB 70%, #1E40AF 100%);
-  box-shadow: 0 0 6px rgba(37, 99, 235, 0.6);
+  background: radial-gradient(circle at 35% 35%, #93C5FD, #2563EB 75%, #1E40AF 100%);
+  box-shadow: 0 0 4px rgba(37, 99, 235, 0.4);
   display: inline-block;
 }
 
-.cdi-dot-amber {
-  width: 14px;
-  height: 14px;
+.status-sphere-amber {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #FDE68A, #F59E0B 70%, #B45309 100%);
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+  background: radial-gradient(circle at 35% 35%, #FDE68A, #F59E0B 75%, #B45309 100%);
+  box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
   display: inline-block;
 }
 
-.cdi-dot-rose {
-  width: 14px;
-  height: 14px;
+.status-sphere-rose {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #FCA5A5, #EF4444 70%, #991B1B 100%);
-  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+  background: radial-gradient(circle at 35% 35%, #FCA5A5, #EF4444 75%, #991B1B 100%);
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
   display: inline-block;
 }
 
-/* Custom Scrollbar */
+/* Sleek Minimalist Scrollbars */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-main);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 4px;
-}
-body.dark-theme ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--border-default);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: var(--border-strong);
 }
 
-/* Shimmer animation for masking banner */
-.shimmer-banner-light {
-  background: linear-gradient(90deg, #FEF3C7 0%, #FEE2E2 50%, #FEF3C7 100%);
+/* Shimmer Animation for Masking Banner */
+.shimmer-masking {
+  background: linear-gradient(90deg, #FFFBEB 0%, #FEF2F2 50%, #FFFBEB 100%);
   background-size: 200% 100%;
-  animation: shimmer 5s infinite linear;
+  animation: shimmer 6s infinite linear;
 }
 
-body.dark-theme .shimmer-banner-light {
-  background: linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(244, 63, 94, 0.2) 50%, rgba(245, 158, 11, 0.15) 100%);
+body.dark-theme .shimmer-masking {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.08) 0%, rgba(239, 68, 68, 0.12) 50%, rgba(245, 158, 11, 0.08) 100%);
   background-size: 200% 100%;
 }
 
@@ -165,13 +194,7 @@ body.dark-theme .shimmer-banner-light {
   100% { background-position: 200% 0; }
 }
 
-/* Tooltip Styling */
-#capacity-tooltip {
-  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+/* Table layout stability */
+table {
+  border-spacing: 0;
 }
-#capacity-container:hover #capacity-tooltip {
-  opacity: 1;
-  transform: translate(-50%, -6px);
-}
-

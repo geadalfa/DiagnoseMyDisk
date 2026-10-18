@@ -47,6 +47,7 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 # Cache data disk
 cached_disks_data = None
 cache_lock = threading.Lock()
+prewarm_event = threading.Event()
 
 
 def prewarm_cache():
@@ -56,8 +57,10 @@ def prewarm_cache():
         data = collect_all_disks_data()
         with cache_lock:
             cached_disks_data = data
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Prewarm error: {e}")
+    finally:
+        prewarm_event.set()
 
 
 class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
@@ -79,6 +82,10 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
 
         if parsed_path.path == "/api/disks":
             try:
+                # Tunggu pre-warming latar belakang hingga 10 detik agar tidak menjalankan query ganda
+                if cached_disks_data is None:
+                    prewarm_event.wait(timeout=10.0)
+                
                 with cache_lock:
                     if cached_disks_data is None:
                         cached_disks_data = collect_all_disks_data()
