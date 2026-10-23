@@ -48,6 +48,8 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 cached_disks_data = None
 cache_lock = threading.Lock()
 prewarm_event = threading.Event()
+last_heartbeat = time.time()
+has_received_heartbeat = False
 
 
 def prewarm_cache():
@@ -56,7 +58,8 @@ def prewarm_cache():
     try:
         data = collect_all_disks_data()
         with cache_lock:
-            cached_disks_data = data
+            if data:
+                cached_disks_data = data
     except Exception as e:
         print(f"Prewarm error: {e}")
     finally:
@@ -76,18 +79,56 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
             return "image/png"
         return super().guess_type(path)
 
+    def do_POST(self):
+        parsed_path = urllib.parse.urlparse(self.path)
+        if parsed_path.path == "/api/shutdown":
+            body = b'{"status":"shutting_down"}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start()
+            return
+        self.send_response(404)
+        self.end_headers()
+
     def do_GET(self):
-        global cached_disks_data
+        global cached_disks_data, last_heartbeat, has_received_heartbeat
         parsed_path = urllib.parse.urlparse(self.path)
 
-        if parsed_path.path == "/api/disks":
+        if parsed_path.path == "/api/heartbeat":
+            last_heartbeat = time.time()
+            has_received_heartbeat = True
+            body = b'{"status":"ok"}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        elif parsed_path.path == "/api/shutdown":
+            body = b'{"status":"shutting_down"}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start()
+            return
+
+        elif parsed_path.path == "/api/disks":
             try:
                 # Tunggu pre-warming latar belakang hingga 10 detik agar tidak menjalankan query ganda
                 if cached_disks_data is None:
                     prewarm_event.wait(timeout=10.0)
                 
                 with cache_lock:
-                    if cached_disks_data is None:
+                    if not cached_disks_data:
                         cached_disks_data = collect_all_disks_data()
                     data_to_send = cached_disks_data
 
@@ -120,12 +161,13 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
             try:
                 new_data = collect_all_disks_data()
                 with cache_lock:
-                    cached_disks_data = new_data
+                    if new_data:
+                        cached_disks_data = new_data
                 
                 resp = {
                     "success": True,
                     "refreshed": True,
-                    "disks": new_data
+                    "disks": cached_disks_data or new_data
                 }
                 body = json.dumps(resp, ensure_ascii=False).encode("utf-8")
 
@@ -194,7 +236,7 @@ def is_server_already_running(port):
     """Cek apakah instansi DiagnoseMyDisk lain sudah berjalan di port ini."""
     try:
         req = urllib.request.Request(f"http://127.0.0.1:{port}/api/disks", method="GET")
-        with urllib.request.urlopen(req, timeout=0.8) as resp:
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
             return resp.status == 200
     except Exception:
         return False
@@ -203,7 +245,7 @@ def is_server_already_running(port):
 def run_server():
     # 1. Cek apakah server sudah aktif di port 5550
     if is_server_already_running(PORT):
-        launch_app_window(f"http://localhost:{PORT}")
+        launch_app_window(f"http://127.0.0.1:{PORT}")
         return
 
     # 2. Mulai pre-warming cache di thread latar belakang
@@ -216,10 +258,23 @@ def run_server():
         httpd = ThreadingHTTPServer(("127.0.0.1", 5551), DiagnoseDiskHandler)
 
     active_port = httpd.server_port
-    url = f"http://localhost:{active_port}"
+    url = f"http://127.0.0.1:{active_port}"
 
     # Buka jendela aplikasi desktop
     threading.Timer(0.3, launch_app_window, args=[url]).start()
+
+    # Watchdog thread: hentikan server jika jendela browser ditutup (heartbeat berhenti)
+    def watchdog_loop():
+        global last_heartbeat, has_received_heartbeat
+        time.sleep(15)  # Beri waktu startup 15 detik pertama
+        while True:
+            time.sleep(3)
+            if has_received_heartbeat:
+                if time.time() - last_heartbeat > 10:
+                    # Jendela ditutup pengguna -> hentikan proses latar belakang
+                    os._exit(0)
+
+    threading.Thread(target=watchdog_loop, daemon=True).start()
 
     try:
         httpd.serve_forever()

@@ -168,16 +168,49 @@ const I18N = {
   }
 };
 
+// Helper eksekusi ikon Lucide yang aman (bebas crash jika CDN terlambat/offline)
+function safeCreateIcons() {
+  if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+    try {
+      lucide.createIcons();
+    } catch (e) {
+      console.warn('lucide createIcons notice:', e);
+    }
+  }
+}
+
 // Inisialisasi awal saat dokumen dimuat
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
   const savedTheme = localStorage.getItem('diagnose_theme');
   enableDarkTheme(savedTheme === 'dark');
 
   const savedLang = localStorage.getItem('diagnose_lang');
   setLanguage(savedLang === 'en' ? 'en' : 'id', false);
 
+  startHeartbeat();
   fetchDisksData();
-});
+}
+
+// Heartbeat & lifecycle: memastikan server backend otomatis berhenti saat jendela desktop ditutup
+function startHeartbeat() {
+  setInterval(() => {
+    fetch('/api/heartbeat').catch(() => {});
+  }, 2500);
+
+  window.addEventListener('beforeunload', () => {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/shutdown');
+    } else {
+      fetch('/api/shutdown', { method: 'POST', keepalive: true }).catch(() => {});
+    }
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 // Penangan Penggantian Bahasa
 function setLanguage(lang, triggerRender = true) {
@@ -267,7 +300,7 @@ function enableDarkTheme(enable) {
     if (themeIcon) themeIcon.setAttribute('data-lucide', 'sun');
     if (themeText) themeText.textContent = t.themeLight;
   }
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 // Pengambilan Data Telemetri Disk
@@ -282,7 +315,7 @@ async function fetchDisksData(isRefresh = false) {
 
   try {
     const url = isRefresh ? '/api/refresh' : '/api/disks';
-    const resp = await fetch(url);
+    const resp = await fetch(url, { cache: 'no-store' });
     if (!resp.ok) throw new Error(`HTTP error ${resp.status}`);
     const data = await resp.json();
 
@@ -297,10 +330,13 @@ async function fetchDisksData(isRefresh = false) {
     }
   } catch (err) {
     console.error('Error fetching disks data:', err);
-    if (retryCount < 5 && !isRefresh) {
+    if (retryCount < 8 && !isRefresh) {
       retryCount++;
-      document.getElementById('disk-count-badge').textContent = t.detectingHardware.replace('{0}', retryCount);
-      setTimeout(() => fetchDisksData(false), 1000);
+      const retryText = currentLang === 'en' 
+        ? `Detecting hardware (${retryCount}/8)...` 
+        : `Mendeteksi hardware (${retryCount}/8)...`;
+      document.getElementById('disk-count-badge').textContent = retryText;
+      setTimeout(() => fetchDisksData(false), 1200);
     } else {
       document.getElementById('disk-count-badge').textContent = t.clickRescan;
     }
@@ -371,7 +407,7 @@ function renderDriveTabs() {
     `;
   }).join('');
 
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 // Memilih disk aktif
@@ -403,7 +439,7 @@ function setMode(mode) {
     viewLayman.classList.add('hidden');
   }
 
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 // Render Disk Aktif
@@ -570,7 +606,7 @@ function renderActiveDisk() {
   renderLaymanView(ha, disk, usedPct);
   renderTechView(ha, disk);
 
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 // Render Konten Mode Ringkasan
