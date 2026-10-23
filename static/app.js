@@ -553,7 +553,6 @@ function renderActiveDisk() {
   const badgeCdiCompare = document.getElementById('badge-cdi-compare');
 
   if (badgePct) badgePct.textContent = `${trueHealth}%`;
-  if (cdiClaimVal) cdiClaimVal.textContent = `${reportedHealth}%`;
 
   if (badgeCdiCompare) {
     if (isMasking) {
@@ -561,6 +560,8 @@ function renderActiveDisk() {
     } else {
       badgeCdiCompare.innerHTML = `${t.standardReaderReport} <span id="cdi-claim-val" class="text-zinc-900 dark:text-zinc-100 font-mono font-bold">${reportedHealth}%</span> <span class="text-emerald-600 font-bold">${t.accurateStatus}</span>`;
     }
+  } else if (cdiClaimVal) {
+    cdiClaimVal.textContent = `${reportedHealth}%`;
   }
 
   badgeHealth.className = 'w-44 py-2.5 px-3 rounded-lg flex flex-col items-center justify-center text-center select-none shadow-xs border transition-all';
@@ -603,15 +604,16 @@ function renderActiveDisk() {
   document.getElementById('disk-poh-text').textContent = t.pohText.replace('{0}', poh.toLocaleString());
 
   // Spesifikasi Teknis
-  document.getElementById('spec-firmware').textContent = disk.firmware || '1.00 / Live';
-  document.getElementById('spec-serial').textContent = disk.serial_number || 'S2K4329254NPP';
-  document.getElementById('spec-interface').textContent = `${disk.bus_type} 6.0 Gb/s`;
-  document.getElementById('spec-poc').textContent = t.pocText.replace('{0}', (disk.power_on_count || 512).toLocaleString());
+  document.getElementById('spec-firmware').textContent = disk.firmware || '-';
+  document.getElementById('spec-serial').textContent = disk.serial_number || '-';
+  const interfaceSpeed = disk.bus_type === 'NVMe' ? 'PCIe NVMe' : `${disk.bus_type || 'SATA'} 6.0 Gb/s`;
+  document.getElementById('spec-interface').textContent = interfaceSpeed;
+  document.getElementById('spec-poc').textContent = disk.power_on_count !== undefined ? t.pocText.replace('{0}', disk.power_on_count.toLocaleString()) : '-';
 
-  const hostWritesTb = metrics.host_writes_tb !== undefined ? metrics.host_writes_tb : (disk.bus_type === 'NVMe' ? 20.6 : 3.8);
-  const hostReadsTb = metrics.host_reads_tb !== undefined ? metrics.host_reads_tb : (disk.bus_type === 'NVMe' ? 19.5 : 4.2);
-  document.getElementById('spec-reads').textContent = `${hostReadsTb} TB`;
-  document.getElementById('spec-writes').textContent = `${hostWritesTb} TB`;
+  const hostWritesTb = metrics.host_writes_tb !== undefined ? `${metrics.host_writes_tb} TB` : '-';
+  const hostReadsTb = metrics.host_reads_tb !== undefined ? `${metrics.host_reads_tb} TB` : '-';
+  document.getElementById('spec-reads').textContent = hostReadsTb;
+  document.getElementById('spec-writes').textContent = hostWritesTb;
 
   // Kapasitas Partisi
   const volumes = disk.volumes || [];
@@ -951,7 +953,9 @@ async function executeScanStep() {
   }
 
   const disk = allDisks[activeDiskIndex] || {};
-  const diskIndex = parseInt(disk.device_id, 10) || 0;
+  const rawDevId = String(disk.device_id || '0');
+  const match = rawDevId.match(/\d+/);
+  const diskIndex = match ? parseInt(match[0], 10) : 0;
   const diskSize = Math.floor((disk.size_gb || 240) * (1024 ** 3));
   const chunkSize = 5;
 
