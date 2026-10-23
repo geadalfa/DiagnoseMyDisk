@@ -200,11 +200,21 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
 
         elif parsed_path.path == "/api/scan_chunk":
             try:
-                disk_index = int(qs.get("disk_index", [0])[0])
-                start_block = int(qs.get("start_block", [0])[0])
-                count = int(qs.get("count", [10])[0])
-                total_blocks = int(qs.get("total_blocks", [200])[0])
-                known_size = int(qs.get("disk_size", [0])[0])
+                raw_idx = qs.get("disk_index", ["0"])[0]
+                import re
+                idx_digits = re.findall(r"\d+", raw_idx)
+                disk_index = int(idx_digits[0]) if idx_digits else 0
+
+                def safe_int(val, default=0):
+                    try:
+                        return int(float(val))
+                    except Exception:
+                        return default
+
+                start_block = safe_int(qs.get("start_block", [0])[0], 0)
+                count = safe_int(qs.get("count", [10])[0], 10)
+                total_blocks = safe_int(qs.get("total_blocks", [200])[0], 200)
+                known_size = safe_int(qs.get("disk_size", [0])[0], 0)
 
                 blocks = scanner.scan_disk_chunk(
                     disk_index=disk_index,

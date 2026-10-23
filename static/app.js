@@ -552,13 +552,15 @@ function renderActiveDisk() {
   const cdiClaimVal = document.getElementById('cdi-claim-val');
   const badgeCdiCompare = document.getElementById('badge-cdi-compare');
 
-  badgePct.textContent = `${trueHealth}%`;
-  cdiClaimVal.textContent = `${reportedHealth}%`;
+  if (badgePct) badgePct.textContent = `${trueHealth}%`;
+  if (cdiClaimVal) cdiClaimVal.textContent = `${reportedHealth}%`;
 
-  if (isMasking) {
-    badgeCdiCompare.innerHTML = `${t.standardReaderReport} <span class="text-zinc-900 dark:text-zinc-100 font-mono font-bold">${reportedHealth}%</span> <span class="text-rose-600 font-bold">${t.lockedStatus}</span>`;
-  } else {
-    badgeCdiCompare.innerHTML = `${t.standardReaderReport} <span class="text-zinc-900 dark:text-zinc-100 font-mono font-bold">${reportedHealth}%</span> <span class="text-emerald-600 font-bold">${t.accurateStatus}</span>`;
+  if (badgeCdiCompare) {
+    if (isMasking) {
+      badgeCdiCompare.innerHTML = `${t.standardReaderReport} <span id="cdi-claim-val" class="text-zinc-900 dark:text-zinc-100 font-mono font-bold">${reportedHealth}%</span> <span class="text-rose-600 font-bold">${t.lockedStatus}</span>`;
+    } else {
+      badgeCdiCompare.innerHTML = `${t.standardReaderReport} <span id="cdi-claim-val" class="text-zinc-900 dark:text-zinc-100 font-mono font-bold">${reportedHealth}%</span> <span class="text-emerald-600 font-bold">${t.accurateStatus}</span>`;
+    }
   }
 
   badgeHealth.className = 'w-44 py-2.5 px-3 rounded-lg flex flex-col items-center justify-center text-center select-none shadow-xs border transition-all';
@@ -949,8 +951,8 @@ async function executeScanStep() {
   }
 
   const disk = allDisks[activeDiskIndex] || {};
-  const diskIndex = disk.device_id || '0';
-  const diskSize = (disk.size_gb || 240) * (1024 ** 3);
+  const diskIndex = parseInt(disk.device_id, 10) || 0;
+  const diskSize = Math.floor((disk.size_gb || 240) * (1024 ** 3));
   const chunkSize = 5;
 
   // Sorot blok aktif yang sedang dipindai
@@ -1035,6 +1037,13 @@ function appendTerminalLog(msg) {
   const time = new Date().toLocaleTimeString();
   terminal.textContent += `\n[${time}] ${msg}`;
   terminal.scrollTop = terminal.scrollHeight;
+}
+
+function clearTerminalLog() {
+  const terminal = document.getElementById('repair-terminal');
+  if (terminal) {
+    terminal.textContent = 'Log dibersihkan. Menunggu instruksi pemulihan atau pemindaian...';
+  }
 }
 
 // Aksi Perbaikan Sistem File (CHKDSK)

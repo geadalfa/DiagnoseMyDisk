@@ -253,11 +253,13 @@ html.dark .block-unscanned, body.dark .block-unscanned {
   border-radius: 6px;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 11px;
-  padding: 10px;
-  max-height: 140px;
+  padding: 12px 14px;
+  min-height: 240px;
+  max-height: 420px;
   overflow-y: auto;
-  line-height: 1.5;
+  line-height: 1.6;
   white-space: pre-wrap;
+  resize: vertical;
 }
 
 /* Minimalist Scrollbars */

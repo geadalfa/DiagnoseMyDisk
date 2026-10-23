@@ -53,13 +53,14 @@ def scan_disk_chunk(disk_index, start_block, count, total_blocks=200, known_size
     - weak (150 - 500 ms): Sangat lambat / degraded (Orange)
     - bad (>= 500 ms atau Error I/O): Bad Sector / Rusak (Red)
     """
-    total_size = known_size
+    total_size = int(known_size) if known_size else 0
     if not total_size:
         total_size = get_disk_geometry(disk_index)
     if not total_size:
-        total_size = 250 * (1024**3)  # Estimasi 250 GB jika tidak terdeteksi
+        total_size = int(250 * (1024**3))  # Estimasi 250 GB jika tidak terdeteksi
 
-    step = max(512, total_size // total_blocks)
+    total_size = max(512, (total_size // 512) * 512)
+    step = max(512, (total_size // total_blocks // 512) * 512)
     results = []
     path = f"\\\\.\\PhysicalDrive{disk_index}"
 
@@ -75,7 +76,7 @@ def scan_disk_chunk(disk_index, start_block, count, total_blocks=200, known_size
                 "offset_gb": round((i * step) / (1024**3), 2),
                 "latency_ms": 0,
                 "speed_mb_s": 0,
-                "status": "error",
+                "status": "bad",
                 "error": f"Akses fisik disk memerlukan Administrator ({e})",
             })
         return results
@@ -84,7 +85,7 @@ def scan_disk_chunk(disk_index, start_block, count, total_blocks=200, known_size
         for i in range(start_block, min(start_block + count, total_blocks)):
             offset = (i * step // 512) * 512
             if offset + block_read_size > total_size:
-                offset = max(0, total_size - block_read_size)
+                offset = max(0, ((total_size - block_read_size) // 512) * 512)
 
             t0 = time.perf_counter()
             try:
