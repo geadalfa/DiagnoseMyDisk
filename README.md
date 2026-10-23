@@ -9,18 +9,18 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v1.3.1-emerald.svg?logo=github&logoColor=white" alt="Release v1.3.1"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v1.4.0-emerald.svg?logo=github&logoColor=white" alt="Release v1.3.1"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
-  <a href="README.md"><img src="https://img.shields.io/badge/Architecture-Multi--Tier%20Telemetry-purple.svg" alt="Architecture"></a>
+  <a href="README.md"><img src="https://img.shields.io/badge/Architecture-Bad%20Sector%20%2B%20Drive%20Doctor-purple.svg" alt="Architecture"></a>
   <a href="README.md"><img src="https://img.shields.io/badge/Offline-100%25%20Zero--CDN-10b981.svg" alt="Offline Ready"></a>
-  <a href="README.md"><img src="https://img.shields.io/badge/UI--UX-Anti--Slop%20Zinc%20Tokens-3f3f46.svg" alt="Anti-Slop UI"></a>
+  <a href="README.md"><img src="https://img.shields.io/badge/UI--UX-Anti--Slop%20Dark%20Mode-3f3f46.svg" alt="Anti-Slop UI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg" alt="License: CC BY-NC 4.0"></a>
 </p>
 
 ---
 
-> **DiagnoseMyDisk** adalah utilitas desktop diagnostik hardware penyimpanan tingkat lanjut untuk Windows 10 & 11. Aplikasi ini membongkar manipulasi pelaporan firmware (*False 100% masking*), menghitung persentase kesehatan fisik sebenarnya (*True Health*) pada SSD NVMe, SSD SATA, dan HDD mekanikal, serta menyajikan telemetri S.M.A.R.T lengkap melalui antarmuka desktop berstandar **Anti-Slop** dengan dua perspektif: **Mode Ringkasan** untuk pengguna awam dan **Mode Forensik S.M.A.R.T** untuk teknisi hardware.
+> **DiagnoseMyDisk** adalah utilitas desktop diagnostik hardware penyimpanan tingkat lanjut untuk Windows 10 & 11. Aplikasi ini membongkar manipulasi pelaporan firmware (*False 100% masking*), menghitung persentase kesehatan fisik sebenarnya (*True Health*) pada SSD NVMe, SSD SATA, dan HDD mekanikal, memindai **Bad Sector** permukaan piringan/sel secara visual (*Surface LBA Map*), memulihkan sistem file & mengoptimasi sel NAND (*Drive Doctor*), serta menyajikan telemetri S.M.A.R.T lengkap melalui antarmuka desktop berstandar **Anti-Slop Zinc Modern** dalam mode terang maupun gelap.
 
 ---
 
@@ -28,6 +28,8 @@
 
 | Kategori | Fitur & Kapabilitas | Sub-Sistem / Engine | Invarian & Standar Teknis | Status |
 | :--- | :--- | :--- | :--- | :---: |
+| **Surface & Repair** | **Bad Sector Surface LBA Map** | ackend/scanner.py & UI | Memindai 200 blok fisik drive secara non-destruktif dengan sector-aligned I/O (kelipatan 512 bytes), mengukur latensi milidetik (ms) dan memetakan blok sehat, lemah, hingga bad sector. | ✅ ACTIVE |
+| | **Drive Doctor (CHKDSK & TRIM)** | ackend/scanner.py & UI | Memicu perbaikan cluster & metadata volume Windows (Repair-Volume), optimasi sel flash NAND (ReTrim), serta audit status Dirty Bit. | ✅ ACTIVE |
 | **Kalkulasi Kesehatan** | **Unmasking Firmware False 100%** | `backend/smart_decoder.py` | Mengabaikan kolom `Current` firmware statis; menghitung degradasi riil dari register mentah `0xA9`, relokasi `0x05`, dan bad block `0xA6`. | ✅ `ACTIVE` |
 | | **NVMe 2.0 True Health Engine** | `backend/smart_decoder.py` | Kepatuhan NVM Express 2.0 Log Page 02h: memvalidasi `Percentage Used` vs `Available Spare` & `Media Integrity Errors`. | ✅ `ACTIVE` |
 | | **Write Amplification (WAF)** | `backend/smart_decoder.py` | Rasio akumulasi penulisan data host terhadap penulisan fisik sel NAND (`HostWrites` vs `NandWrites`). | ✅ `ACTIVE` |

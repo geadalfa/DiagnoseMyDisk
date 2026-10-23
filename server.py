@@ -1,11 +1,13 @@
 """
 server.py
 Desktop Server mandiri berkecepatan tinggi untuk DiagnoseMyDisk.
-Mendukung multi-threading, background pre-warming, dan penanganan koneksi tanpa crash.
+Mendukung multi-threading, background pre-warming, Bad Sector Surface Scanner,
+dan alat perbaikan sistem file & TRIM (Drive Doctor).
 """
 
 import os
 import sys
+import ctypes
 
 # Proteksi crash sys.stdout/stderr pada mode windowed (--noconsole)
 if sys.stdout is None:
@@ -39,7 +41,8 @@ backend_path = os.path.join(BASE_DIR, "backend")
 if backend_path not in sys.path:
     sys.path.append(backend_path)
 
-from collector import collect_all_disks_data
+from collector import collect_all_disks_data, is_admin
+import scanner
 
 PORT = 5550
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -79,54 +82,89 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
             return "image/png"
         return super().guess_type(path)
 
-    def do_POST(self):
-        parsed_path = urllib.parse.urlparse(self.path)
-        if parsed_path.path == "/api/shutdown":
-            body = b'{"status":"shutting_down"}'
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
+    def _send_json(self, data, status=200):
+        try:
+            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(body)
+        except Exception:
+            pass
+
+    def do_POST(self):
+        parsed_path = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed_path.query)
+
+        # Baca body JSON jika ada
+        body_data = {}
+        try:
+            content_len = int(self.headers.get("Content-Length", 0))
+            if content_len > 0:
+                raw_bytes = self.rfile.read(content_len)
+                body_data = json.loads(raw_bytes.decode("utf-8"))
+        except Exception:
+            pass
+
+        if parsed_path.path == "/api/shutdown":
+            self._send_json({"status": "shutting_down"})
             threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start()
             return
+
+        elif parsed_path.path == "/api/relaunch_admin":
+            try:
+                if getattr(sys, "frozen", False):
+                    exe_path = sys.executable
+                    params = ""
+                else:
+                    exe_path = sys.executable
+                    params = f'"{os.path.abspath(__file__)}"'
+                ctypes.windll.shell32.ShellExecuteW(None, "runas", exe_path, params, None, 1)
+                self._send_json({"success": True, "message": "Aplikasi sedang dimulai ulang dengan Administrator."})
+                threading.Thread(target=lambda: (time.sleep(0.6), os._exit(0))).start()
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/repair_trim":
+            drive = body_data.get("drive") or (qs.get("drive", ["C"])[0])
+            result = scanner.run_trim_optimization(drive)
+            self._send_json(result)
+            return
+
+        elif parsed_path.path == "/api/repair_chkdsk":
+            drive = body_data.get("drive") or (qs.get("drive", ["C"])[0])
+            result = scanner.repair_filesystem(drive)
+            self._send_json(result)
+            return
+
         self.send_response(404)
         self.end_headers()
 
     def do_GET(self):
         global cached_disks_data, last_heartbeat, has_received_heartbeat
         parsed_path = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed_path.query)
 
         if parsed_path.path == "/api/heartbeat":
             last_heartbeat = time.time()
             has_received_heartbeat = True
-            body = b'{"status":"ok"}'
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(body)
+            self._send_json({"status": "ok"})
             return
 
         elif parsed_path.path == "/api/shutdown":
-            body = b'{"status":"shutting_down"}'
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(body)
+            self._send_json({"status": "shutting_down"})
             threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start()
             return
 
         elif parsed_path.path == "/api/disks":
             try:
-                # Tunggu pre-warming latar belakang hingga 10 detik agar tidak menjalankan query ganda
                 if cached_disks_data is None:
                     prewarm_event.wait(timeout=10.0)
-                
+
                 with cache_lock:
                     if not cached_disks_data:
                         cached_disks_data = collect_all_disks_data()
@@ -134,27 +172,12 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
 
                 resp = {
                     "success": True,
-                    "disks": data_to_send
+                    "is_admin": is_admin(),
+                    "disks": data_to_send,
                 }
-                body = json.dumps(resp, ensure_ascii=False).encode("utf-8")
-
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Cache-Control", "no-cache")
-                self.end_headers()
-                self.wfile.write(body)
+                self._send_json(resp)
             except Exception as e:
-                try:
-                    err_body = json.dumps({"success": False, "error": str(e), "disks": []}).encode("utf-8")
-                    self.send_response(500)
-                    self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", str(len(err_body)))
-                    self.end_headers()
-                    self.wfile.write(err_body)
-                except Exception:
-                    pass
+                self._send_json({"success": False, "error": str(e), "disks": []}, status=500)
             return
 
         elif parsed_path.path == "/api/refresh":
@@ -163,31 +186,45 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 with cache_lock:
                     if new_data:
                         cached_disks_data = new_data
-                
+
                 resp = {
                     "success": True,
                     "refreshed": True,
-                    "disks": cached_disks_data or new_data
+                    "is_admin": is_admin(),
+                    "disks": cached_disks_data or new_data,
                 }
-                body = json.dumps(resp, ensure_ascii=False).encode("utf-8")
-
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Cache-Control", "no-cache")
-                self.end_headers()
-                self.wfile.write(body)
+                self._send_json(resp)
             except Exception as e:
-                try:
-                    err_body = json.dumps({"success": False, "error": str(e), "disks": []}).encode("utf-8")
-                    self.send_response(500)
-                    self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", str(len(err_body)))
-                    self.end_headers()
-                    self.wfile.write(err_body)
-                except Exception:
-                    pass
+                self._send_json({"success": False, "error": str(e), "disks": []}, status=500)
+            return
+
+        elif parsed_path.path == "/api/scan_chunk":
+            try:
+                disk_index = int(qs.get("disk_index", [0])[0])
+                start_block = int(qs.get("start_block", [0])[0])
+                count = int(qs.get("count", [10])[0])
+                total_blocks = int(qs.get("total_blocks", [200])[0])
+                known_size = int(qs.get("disk_size", [0])[0])
+
+                blocks = scanner.scan_disk_chunk(
+                    disk_index=disk_index,
+                    start_block=start_block,
+                    count=count,
+                    total_blocks=total_blocks,
+                    known_size=known_size,
+                )
+                self._send_json({"success": True, "disk_index": disk_index, "blocks": blocks})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e), "blocks": []}, status=500)
+            return
+
+        elif parsed_path.path == "/api/dirty_check":
+            try:
+                drive = qs.get("drive", ["C"])[0]
+                res = scanner.check_dirty_bit(drive)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
             return
 
         # Fallback ke file statis HTML/CSS/JS/Icons
@@ -219,7 +256,7 @@ def launch_app_window(url):
                     b_path,
                     f"--app={url}",
                     f"--user-data-dir={user_data_dir}",
-                    "--window-size=1200,850",
+                    "--window-size=1260,880",
                     "--disable-extensions",
                     "--disable-plugins",
                 ]

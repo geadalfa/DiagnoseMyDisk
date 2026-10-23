@@ -9,6 +9,8 @@ import os
 import re
 import json
 import subprocess
+import ctypes
+
 try:
     from smart_decoder import (
         decode_ata_smart_table,
@@ -29,23 +31,45 @@ except ImportError:
 SMART_CACHE_DIR = r"C:\Program Files\CrystalDiskInfo\Smart"
 
 
+def is_admin():
+    """Mengecek apakah proses memiliki hak Administrator penuh."""
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except Exception:
+        return False
+
+
 def query_system_telemetry():
     """
     Menjalankan query telemetri terpadu ke PowerShell dengan flags CREATE_NO_WINDOW
     sehingga proses berlangsung instan (~1 detik) tanpa pernah membuka jendela CMD/console.
+    Dilengkapi deteksi hak elevasi administrator & fallback instan agar tidak pernah freeze.
     """
-    ps_code = """
-    $ErrorActionPreference = 'SilentlyContinue'
-    $disks = Get-PhysicalDisk | Select-Object DeviceId, FriendlyName, MediaType, BusType, Size, HealthStatus, SerialNumber, Model
-    if (-not $disks) {
-        $disks = Get-CimInstance Win32_DiskDrive | Select-Object @{N='DeviceId';E={[string]$_.Index}}, @{N='FriendlyName';E={$_.Model}}, @{N='MediaType';E={'SSD'}}, @{N='BusType';E={$_.InterfaceType}}, Size, @{N='HealthStatus';E={'Healthy'}}, @{N='SerialNumber';E={$_.SerialNumber}}, @{N='Model';E={$_.Model}}
-    }
-    $parts = Get-Partition | Where-Object { $_.DriveLetter } | Select-Object DiskNumber, PartitionNumber, DriveLetter, Size
-    $vols = Get-Volume | Where-Object { $_.DriveLetter } | Select-Object DriveLetter, FileSystemLabel, FileSystem, SizeRemaining, Size
-    $smart = Get-CimInstance -Namespace 'root/wmi' -ClassName MSStorageDriver_ATAPISmartData -ErrorAction SilentlyContinue | Select-Object InstanceName, VendorSpecific
-    $smartThresh = Get-CimInstance -Namespace 'root/wmi' -ClassName MSStorageDriver_FailurePredictThresholds -ErrorAction SilentlyContinue | Select-Object InstanceName, VendorSpecific
-    @{ Disks = $disks; Partitions = $parts; Volumes = $vols; Smart = $smart; SmartThresh = $smartThresh } | ConvertTo-Json -Depth 4 -Compress
-    """
+    admin_mode = is_admin()
+
+    if admin_mode:
+        ps_code = """
+        $ErrorActionPreference = 'SilentlyContinue'
+        $disks = Get-PhysicalDisk | Select-Object DeviceId, FriendlyName, MediaType, BusType, Size, HealthStatus, SerialNumber, Model
+        if (-not $disks) {
+            $disks = Get-CimInstance Win32_DiskDrive | Select-Object @{N='DeviceId';E={[string]$_.Index}}, @{N='FriendlyName';E={$_.Model}}, @{N='MediaType';E={if ($_.Model -match 'WD20|HDD|WDC') {'HDD'} else {'SSD'}}}, @{N='BusType';E={if ($_.Model -match 'NVMe|LEGEND') {'NVMe'} else {$_.InterfaceType}}}, Size, @{N='HealthStatus';E={$_.Status}}, @{N='SerialNumber';E={$_.SerialNumber}}, @{N='Model';E={$_.Model}}
+        }
+        $parts = Get-Partition | Where-Object { $_.DriveLetter } | Select-Object DiskNumber, PartitionNumber, DriveLetter, Size
+        $vols = Get-Volume | Where-Object { $_.DriveLetter } | Select-Object DriveLetter, FileSystemLabel, FileSystem, SizeRemaining, Size
+        $smart = Get-CimInstance -Namespace 'root/wmi' -ClassName MSStorageDriver_ATAPISmartData -ErrorAction SilentlyContinue | Select-Object InstanceName, VendorSpecific
+        $smartThresh = Get-CimInstance -Namespace 'root/wmi' -ClassName MSStorageDriver_FailurePredictThresholds -ErrorAction SilentlyContinue | Select-Object InstanceName, VendorSpecific
+        @{ Disks = $disks; Partitions = $parts; Volumes = $vols; Smart = $smart; SmartThresh = $smartThresh; IsAdmin = $true } | ConvertTo-Json -Depth 4 -Compress
+        """
+        timeout_sec = 10
+    else:
+        # Non-admin fast path: Win32_DiskDrive & Win32_LogicalDisk (selalu terbuka & bebas hang < 0.4s)
+        ps_code = """
+        $ErrorActionPreference = 'SilentlyContinue'
+        $disks = Get-CimInstance Win32_DiskDrive | Select-Object @{N='DeviceId';E={[string]$_.Index}}, @{N='FriendlyName';E={$_.Model}}, @{N='MediaType';E={if ($_.Model -match 'WD20|HDD|WDC') {'HDD'} else {'SSD'}}}, @{N='BusType';E={if ($_.Model -match 'NVMe|LEGEND') {'NVMe'} else {$_.InterfaceType}}}, Size, @{N='HealthStatus';E={$_.Status}}, @{N='SerialNumber';E={$_.SerialNumber}}, @{N='Model';E={$_.Model}}
+        $vols = Get-CimInstance Win32_LogicalDisk | Where-Object { $_.DeviceID } | Select-Object @{N='DriveLetter';E={$_.DeviceID.TrimEnd(':')}}, @{N='FileSystemLabel';E={$_.VolumeName}}, @{N='FileSystem';E={$_.FileSystem}}, @{N='SizeRemaining';E={$_.FreeSpace}}, Size
+        @{ Disks = $disks; Partitions = @(); Volumes = $vols; Smart = @(); SmartThresh = @(); IsAdmin = $false } | ConvertTo-Json -Depth 4 -Compress
+        """
+        timeout_sec = 5
 
     startupinfo = None
     creationflags = 0
@@ -60,16 +84,35 @@ def query_system_telemetry():
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_code],
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=timeout_sec,
             startupinfo=startupinfo,
             creationflags=creationflags,
         )
         if p.returncode == 0 and p.stdout.strip():
             return json.loads(p.stdout.strip())
     except Exception as e:
-        print(f"Error querying telemetry: {e}")
+        print(f"Error querying telemetry (admin={admin_mode}): {e}")
 
-    return {"Disks": [], "Partitions": [], "Volumes": [], "Smart": [], "SmartThresh": []}
+    # Fallback darurat jika PowerShell timeout: coba fast CIM Win32_DiskDrive
+    try:
+        fast_code = "Get-CimInstance Win32_DiskDrive | Select-Object @{N='DeviceId';E={[string]$_.Index}}, @{N='FriendlyName';E={$_.Model}}, @{N='MediaType';E={'SSD'}}, @{N='BusType';E={$_.InterfaceType}}, Size, @{N='HealthStatus';E={$_.Status}}, @{N='SerialNumber';E={$_.SerialNumber}}, @{N='Model';E={$_.Model}} | ConvertTo-Json -Compress"
+        p = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", fast_code],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            startupinfo=startupinfo,
+            creationflags=creationflags,
+        )
+        if p.returncode == 0 and p.stdout.strip():
+            fallback_disks = json.loads(p.stdout.strip())
+            if isinstance(fallback_disks, dict):
+                fallback_disks = [fallback_disks]
+            return {"Disks": fallback_disks, "Partitions": [], "Volumes": [], "Smart": [], "SmartThresh": [], "IsAdmin": admin_mode}
+    except Exception:
+        pass
+
+    return {"Disks": [], "Partitions": [], "Volumes": [], "Smart": [], "SmartThresh": [], "IsAdmin": admin_mode}
 
 
 def parse_smart_ini(ini_path, is_nvme=False):
@@ -525,6 +568,7 @@ def collect_all_disks_data():
             "power_on_count": poc,
             "health_analysis": health_analysis,
             "smart_attributes": smart_attributes,
+            "is_admin": is_admin(),
         })
 
     return results
