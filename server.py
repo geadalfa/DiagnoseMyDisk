@@ -42,6 +42,7 @@ if backend_path not in sys.path:
     sys.path.append(backend_path)
 
 from collector import collect_all_disks_data, is_admin
+from hardware_profile import get_flash_technology_glossary
 import scanner
 
 PORT = 5550
@@ -81,6 +82,12 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
         if path.endswith(".png"):
             return "image/png"
         return super().guess_type(path)
+
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
 
     def _send_json(self, data, status=200):
         try:
@@ -160,6 +167,10 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
             threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start()
             return
 
+        elif parsed_path.path == "/api/glossary":
+            self._send_json({"success": True, "glossary": get_flash_technology_glossary()})
+            return
+
         elif parsed_path.path == "/api/disks":
             try:
                 if cached_disks_data is None:
@@ -174,6 +185,7 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                     "success": True,
                     "is_admin": is_admin(),
                     "disks": data_to_send,
+                    "glossary": get_flash_technology_glossary(),
                 }
                 self._send_json(resp)
             except Exception as e:
@@ -192,6 +204,7 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                     "refreshed": True,
                     "is_admin": is_admin(),
                     "disks": cached_disks_data or new_data,
+                    "glossary": get_flash_technology_glossary(),
                 }
                 self._send_json(resp)
             except Exception as e:
@@ -269,6 +282,8 @@ def launch_app_window(url):
                     "--window-size=1260,880",
                     "--disable-extensions",
                     "--disable-plugins",
+                    "--disable-http-cache",
+                    "--disk-cache-size=0",
                 ]
                 subprocess.Popen(cmd)
                 return
@@ -280,11 +295,21 @@ def launch_app_window(url):
 
 
 def is_server_already_running(port):
-    """Cek apakah instansi DiagnoseMyDisk lain sudah berjalan di port ini."""
+    """Cek apakah instansi DiagnoseMyDisk lain sudah berjalan di port ini dengan versi terbaru."""
     try:
         req = urllib.request.Request(f"http://127.0.0.1:{port}/api/disks", method="GET")
         with urllib.request.urlopen(req, timeout=1.5) as resp:
-            return resp.status == 200
+            if resp.status == 200:
+                data = json.loads(resp.read().decode("utf-8"))
+                # Jika server yang sedang aktif adalah versi lama (belum ada glossary), matikan agar versi baru naik
+                if not data.get("glossary"):
+                    try:
+                        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/shutdown", timeout=1.0)
+                        time.sleep(0.6)
+                    except Exception:
+                        pass
+                    return False
+                return True
     except Exception:
         return False
 

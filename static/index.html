@@ -27,7 +27,7 @@
   <!-- Offline Native Desktop Assets (Zero External CDN Dependency) -->
   <script src="tailwind.min.js"></script>
   <script src="lucide.min.js"></script>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=1.5.0">
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -58,7 +58,7 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="text-sm font-black tracking-tight text-zinc-900 dark:text-zinc-50">Diagnose<span class="text-blue-600 dark:text-blue-400">MyDisk</span></span>
-            <span class="px-1.5 py-0.2 text-[10px] font-mono font-bold rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700">v1.4</span>
+            <span class="px-1.5 py-0.2 text-[10px] font-mono font-bold rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700">v1.5</span>
             
             <!-- Admin Status Badge -->
             <div id="admin-badge-container" class="flex items-center gap-1.5 pl-1.5">
@@ -203,8 +203,11 @@
             <!-- Drive Header -->
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
               <div>
-                <h2 id="disk-model-name" class="text-base font-black text-zinc-900 dark:text-zinc-50 tracking-tight">--</h2>
-                <div class="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h2 id="disk-model-name" class="text-base font-black text-zinc-900 dark:text-zinc-50 tracking-tight">--</h2>
+                  <div id="disk-hero-badges" class="flex items-center gap-1.5 flex-wrap"></div>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 flex-wrap">
                   <span id="disk-capacity-type" class="font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">-- GB</span>
                   <span>•</span>
                   <span id="disk-interface-type" class="font-medium">--</span>
@@ -219,8 +222,8 @@
               </div>
             </div>
 
-            <!-- Metadata Specs Grid -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-2 gap-x-4 text-xs font-mono">
+            <!-- Metadata Specs Grid (8 Hardware Telemetry Points) -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-y-2 gap-x-3 text-xs font-mono">
               <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
                 <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-firmware">FIRMWARE</span>
                 <span id="spec-firmware" class="text-zinc-800 dark:text-zinc-200 font-semibold truncate block">--</span>
@@ -231,7 +234,15 @@
               </div>
               <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
                 <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-interface">INTERFACE</span>
-                <span id="spec-interface" class="text-zinc-800 dark:text-zinc-200 font-semibold">--</span>
+                <span id="spec-interface" class="text-zinc-800 dark:text-zinc-200 font-semibold truncate block">--</span>
+              </div>
+              <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
+                <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-nand-type">TIPE FLASH / MEDIA</span>
+                <span id="spec-nand-type" class="text-blue-600 dark:text-blue-400 font-bold truncate block">--</span>
+              </div>
+              <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
+                <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-cache-type">CACHE / HMB</span>
+                <span id="spec-cache-type" class="text-purple-600 dark:text-purple-400 font-semibold truncate block">--</span>
               </div>
               <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
                 <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-poc">POWER CYCLES</span>
@@ -280,6 +291,65 @@
       <!-- VIEW 1: MODE RINGKASAN (HARDWARE SUMMARY & GUIDANCE) -->
       <div id="view-layman" class="space-y-3.5">
         
+        <!-- SECTION: HARDWARE & FLASH ARCHITECTURE CARD -->
+        <div class="app-surface p-4 space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2.5">
+            <div class="flex items-center gap-2">
+              <i data-lucide="cpu" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
+              <div>
+                <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider" id="txt-flash-arch-title">Arsitektur Flash & Fitur Hardware</h3>
+                <p class="text-[11px] text-zinc-500 dark:text-zinc-400" id="txt-flash-arch-subtitle">Spesifikasi teknologi sel memori (TLC/QLC/SLC), arsitektur DRAM/HMB, dan kontroler hardware</p>
+              </div>
+            </div>
+            <button onclick="openGlossaryModal()" class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 text-xs font-semibold transition-all">
+              <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+              <span id="txt-btn-glossary">Panduan Edukasi QLC/TLC & Fitur</span>
+            </button>
+          </div>
+
+          <!-- 4 Pillars Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 font-mono text-xs">
+            <div class="bg-zinc-50 dark:bg-zinc-850 p-2.5 rounded border border-zinc-200/80 dark:border-zinc-800 space-y-1">
+              <span class="text-zinc-400 block text-[10px] font-sans font-bold uppercase tracking-wider" id="lbl-hw-nand">Tipe Sel Flash</span>
+              <span id="hw-nand-type" class="text-zinc-900 dark:text-zinc-100 font-bold block truncate">--</span>
+              <span id="hw-nand-sub" class="text-[10px] text-blue-600 dark:text-blue-400 block truncate">--</span>
+            </div>
+            <div class="bg-zinc-50 dark:bg-zinc-850 p-2.5 rounded border border-zinc-200/80 dark:border-zinc-800 space-y-1">
+              <span class="text-zinc-400 block text-[10px] font-sans font-bold uppercase tracking-wider" id="lbl-hw-cache">Arsitektur Cache</span>
+              <span id="hw-cache-type" class="text-zinc-900 dark:text-zinc-100 font-bold block truncate">--</span>
+              <span id="hw-cache-sub" class="text-[10px] text-purple-600 dark:text-purple-400 block truncate">--</span>
+            </div>
+            <div class="bg-zinc-50 dark:bg-zinc-850 p-2.5 rounded border border-zinc-200/80 dark:border-zinc-800 space-y-1">
+              <span class="text-zinc-400 block text-[10px] font-sans font-bold uppercase tracking-wider" id="lbl-hw-slc">Akselerasi Tulis</span>
+              <span id="hw-slc-type" class="text-zinc-900 dark:text-zinc-100 font-bold block truncate">--</span>
+              <span id="hw-slc-sub" class="text-[10px] text-amber-600 dark:text-amber-400 block truncate">--</span>
+            </div>
+            <div class="bg-zinc-50 dark:bg-zinc-850 p-2.5 rounded border border-zinc-200/80 dark:border-zinc-800 space-y-1">
+              <span class="text-zinc-400 block text-[10px] font-sans font-bold uppercase tracking-wider" id="lbl-hw-pe">Rating Siklus P/E</span>
+              <span id="hw-pe-cycles" class="text-zinc-900 dark:text-zinc-100 font-bold block truncate">--</span>
+              <span id="hw-pe-sub" class="text-[10px] text-zinc-500 dark:text-zinc-400 block truncate">--</span>
+            </div>
+          </div>
+
+          <!-- Special Summary Callout Box -->
+          <div class="bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-lg p-3 text-xs leading-relaxed space-y-1">
+            <div class="flex items-center gap-1.5 font-bold text-blue-900 dark:text-blue-300">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0"></i>
+              <span id="lbl-hw-summary-title">Maksud Fitur & Karakteristik untuk Drive Ini:</span>
+            </div>
+            <p id="hw-summary-text" class="text-zinc-700 dark:text-zinc-300 font-medium"></p>
+          </div>
+
+          <!-- Active Features Badges Container -->
+          <div class="space-y-1.5 pt-0.5">
+            <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block" id="lbl-active-features">Fitur & Instruksi Hardware Aktif:</span>
+            <div id="hw-features-container" class="flex flex-wrap gap-1.5">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+
+        </div>
+
         <!-- Degradation Factors Card -->
         <div class="app-surface p-4 space-y-3">
           <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2.5">
@@ -581,6 +651,154 @@
     </div>
   </footer>
 
-  <script src="app.js"></script>
+  <!-- MODAL: GLOSARIUM & PANDUAN TEKNOLOGI NAND FLASH & HARDWARE DISK -->
+  <div id="glossary-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity duration-200">
+    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Modal Header -->
+      <div class="px-5 py-3.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-850 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="p-1.5 rounded-md bg-blue-600 text-white">
+            <i data-lucide="book-open" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-black text-zinc-900 dark:text-zinc-100 tracking-tight" id="modal-glossary-title">Panduan Edukasi Teknologi Flash NAND & Fitur SSD/Disk</h3>
+            <p class="text-[11px] text-zinc-500 dark:text-zinc-400" id="modal-glossary-subtitle">Penjelasan mendalam tentang QLC, TLC, MLC, SLC, DRAM, HMB, TRIM & SMR</p>
+          </div>
+        </div>
+        <button onclick="closeGlossaryModal()" class="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="p-5 overflow-y-auto space-y-4 text-xs leading-relaxed">
+        
+        <!-- Section 1: Perbandingan Sel NAND (SLC vs MLC vs TLC vs QLC) -->
+        <div class="space-y-2">
+          <h4 class="font-bold text-zinc-900 dark:text-zinc-100 text-xs flex items-center gap-1.5" id="modal-sec1-title">
+            <i data-lucide="layers" class="w-3.5 h-3.5 text-blue-500"></i>
+            <span>Hierarki Sel Flash: SLC vs MLC vs TLC vs QLC</span>
+          </h4>
+          <p class="text-zinc-600 dark:text-zinc-300" id="modal-sec1-desc">
+            Sel flash NAND menyimpan elektron di dalam transistor silikon. Perbedaan utama SLC, MLC, TLC, dan QLC adalah <strong>berapa banyak bit data yang dijejalkan ke dalam 1 sel fisik tunggal</strong>:
+          </p>
+
+          <div class="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+            <table class="w-full text-left border-collapse text-[11px] font-mono">
+              <thead class="bg-zinc-50 dark:bg-zinc-800 text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+                <tr>
+                  <th class="py-2 px-3">Tipe Sel</th>
+                  <th class="py-2 px-2 text-center">Bit / Sel</th>
+                  <th class="py-2 px-2 text-center">Status Voltase</th>
+                  <th class="py-2 px-2 text-center">Ketahanan P/E</th>
+                  <th class="py-2 px-3">Karakteristik & Performa</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
+                <tr>
+                  <td class="py-2 px-3 font-bold text-emerald-600">SLC</td>
+                  <td class="py-2 px-2 text-center">1 Bit</td>
+                  <td class="py-2 px-2 text-center">2 (0/1)</td>
+                  <td class="py-2 px-2 text-center font-bold text-emerald-600">50.000 - 100.000</td>
+                  <td class="py-2 px-3">Tercepat, latensi terendah, daya tahan tertinggi. Biaya paling mahal. Digunakan sebagai cache.</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3 font-bold text-blue-600">MLC</td>
+                  <td class="py-2 px-2 text-center">2 Bit</td>
+                  <td class="py-2 px-2 text-center">4 (00..11)</td>
+                  <td class="py-2 px-2 text-center font-bold text-blue-600">3.000 - 10.000</td>
+                  <td class="py-2 px-3">Sangat kencang dan awet. Dahulu dipakai di seri Samsung Pro lawas.</td>
+                </tr>
+                <tr class="bg-blue-50/30 dark:bg-blue-950/20">
+                  <td class="py-2 px-3 font-bold text-blue-500">TLC (Standar)</td>
+                  <td class="py-2 px-2 text-center font-bold">3 Bit</td>
+                  <td class="py-2 px-2 text-center">8</td>
+                  <td class="py-2 px-2 text-center font-bold text-blue-500">1.500 - 3.000</td>
+                  <td class="py-2 px-3 font-medium"><strong>Standar Emas Modern</strong> (ADATA Legend 900, 980 Pro). Seimbang sempurna antara harga, kapasitas, dan ketahanan puluhan tahun.</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-3 font-bold text-amber-500">QLC</td>
+                  <td class="py-2 px-2 text-center">4 Bit</td>
+                  <td class="py-2 px-2 text-center font-bold text-rose-500">16</td>
+                  <td class="py-2 px-2 text-center font-bold text-amber-500">300 - 1.000</td>
+                  <td class="py-2 px-3">Kapasitas 33% lebih padat, harga jauh lebih murah. Mengandalkan SLC Cache untuk kecepatan harian.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section 2: Maksud Fitur QLC (Menjawab Pertanyaan Alfa) -->
+        <div class="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-lg p-3.5 space-y-2">
+          <h4 class="font-bold text-amber-950 dark:text-amber-200 text-xs flex items-center gap-1.5" id="modal-sec2-title">
+            <i data-lucide="help-circle" class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0"></i>
+            <span>Apa Maksud & Tujuan Fitur QLC Sebenarnya?</span>
+          </h4>
+          <div class="text-zinc-700 dark:text-zinc-300 space-y-1.5" id="modal-sec2-desc">
+            <p>
+              <strong>1. Kenapa Produsen Membuat QLC?</strong><br>
+              Dengan memuat 4 bit ke dalam 1 sel (16 status voltase mikro), kapasitas penyimpanan melonjak 33% pada ukuran fisik wafer silikon yang sama. Ini membuat SSD berkapasitas masif (seperti 2TB, 4TB, hingga 8TB) menjadi jauh lebih terjangkau untuk pengguna umum.
+            </p>
+            <p>
+              <strong>2. Kenapa Butuh Fitur SLC Cache?</strong><br>
+              Karena controller harus membedakan 16 tingkat voltase yang sangat rapat, kecepatan tulis asli (direct-to-die) sel QLC tergolong lambat (~80-150 MB/s). Untuk menyiasatinya, controller SSD memprogram sebagian kapasitas kosong sebagai <strong>SLC Cache (1-bit cepat)</strong>. Ketika Anda menyalin file harian, kecepatan tembus 3.000 - 5.000 MB/s. Namun jika Anda menyalin file raksasa (misal 100GB game sekaligus) dan SLC cache penuh, kecepatan akan turun ke kecepatan murni QLC.
+            </p>
+            <p>
+              <strong>3. Apakah QLC Cepat Rusak?</strong><br>
+              Meskipun memiliki rating ~300-1.000 P/E Cycles, SSD QLC modern berkapasitas 2TB memiliki rating ketahanan 400-800 TBW. Untuk penggunaan normal sehari-hari dan gaming (menulis rata-rata 30-50 GB per hari), drive QLC sanggup bertahan lebih dari 15-20 tahun sebelum batas aus tercapai.
+            </p>
+          </div>
+        </div>
+
+        <!-- Section 3: DRAM Cache vs HMB (Host Memory Buffer) -->
+        <div class="space-y-1.5">
+          <h4 class="font-bold text-zinc-900 dark:text-zinc-100 text-xs flex items-center gap-1.5" id="modal-sec3-title">
+            <i data-lucide="cpu" class="w-3.5 h-3.5 text-purple-500"></i>
+            <span>DRAM Cache vs DRAM-less (HMB)</span>
+          </h4>
+          <p class="text-zinc-600 dark:text-zinc-300" id="modal-sec3-desc">
+            • <strong>DRAM Cache:</strong> Chip RAM onboard mandiri di SSD untuk menyimpan Flash Translation Layer (FTL). Mempercepat respon pencarian file acak (Random 4K).<br>
+            • <strong>HMB (Host Memory Buffer):</strong> SSD NVMe tanpa DRAM mandiri dapat 'meminjam' ~64MB RAM komputer melalui jalur PCIe DMA untuk menyimpan FTL. Ini membuat SSD DRAM-less modern memiliki performa mendekati SSD ber-DRAM fisik.
+          </p>
+        </div>
+
+        <!-- Section 4: TRIM & SMR -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <div class="bg-zinc-50 dark:bg-zinc-850 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-1">
+            <div class="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+              <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+              <span>Pentingnya TRIM</span>
+            </div>
+            <p class="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              TRIM memberitahu SSD blok mana yang sudah dihapus oleh Windows. Ini mencegah SSD melakukan read-modify-write yang lambat dan menjaga faktor Write Amplification (WAF) tetap rendah.
+            </p>
+          </div>
+
+          <div class="bg-zinc-50 dark:bg-zinc-850 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-1">
+            <div class="flex items-center gap-1.5 font-bold text-blue-600 dark:text-blue-400 text-xs">
+              <i data-lucide="disc" class="w-3.5 h-3.5"></i>
+              <span>SMR vs CMR (Hard Disk)</span>
+            </div>
+            <p class="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              SMR (seperti WD20EZAZ) menumpuk trek piringan seperti genteng untuk memadatkan kapasitas secara murah. Sangat stabil untuk arsip dan backup, dengan buffer DRAM 256MB.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 flex items-center justify-between shrink-0">
+        <span class="text-[11px] font-mono text-zinc-500" id="modal-footer-tip">Tekan Esc atau klik tombol untuk menutup</span>
+        <button onclick="closeGlossaryModal()" class="px-4 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs transition-all">
+          Tutup Panduan
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="app.js?v=1.5.0"></script>
 </body>
 </html>

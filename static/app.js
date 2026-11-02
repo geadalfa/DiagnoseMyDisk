@@ -109,6 +109,21 @@ const I18N = {
     scanStart: 'Mulai Pemindaian Sektor',
     scanPause: 'Jeda Pemindaian',
     scanResume: 'Lanjutkan Pemindaian',
+    lblNandType: 'TIPE FLASH / MEDIA',
+    lblCacheType: 'CACHE / HMB',
+    flashArchTitle: 'Arsitektur Flash & Fitur Hardware',
+    flashArchSubtitle: 'Spesifikasi teknologi sel memori (TLC/QLC/SLC), arsitektur DRAM/HMB, dan kontroler hardware',
+    btnGlossary: 'Panduan Edukasi QLC/TLC & Fitur',
+    lblHwNand: 'Tipe Sel Flash',
+    lblHwCache: 'Arsitektur Cache',
+    lblHwSlc: 'Akselerasi Tulis',
+    lblHwPe: 'Rating Siklus P/E',
+    lblHwSummaryTitle: 'Maksud Fitur & Karakteristik untuk Drive Ini:',
+    lblActiveFeatures: 'Fitur & Instruksi Hardware Aktif:',
+    modalGlossaryTitle: 'Panduan Edukasi Teknologi Flash NAND & Fitur SSD/Disk',
+    modalGlossarySubtitle: 'Penjelasan mendalam tentang QLC, TLC, MLC, SLC, DRAM, HMB, TRIM & SMR',
+    modalFooterTip: 'Tekan Esc atau klik tombol untuk menutup',
+    modalBtnClose: 'Tutup Panduan',
   },
   en: {
     appSubtitle: 'True Health Verification, Bad Sector Scan & S.M.A.R.T Telemetry',
@@ -195,6 +210,21 @@ const I18N = {
     scanStart: 'Start Surface Scan',
     scanPause: 'Pause Scan',
     scanResume: 'Resume Scan',
+    lblNandType: 'FLASH / MEDIA TYPE',
+    lblCacheType: 'CACHE / HMB',
+    flashArchTitle: 'Flash Architecture & Hardware Features',
+    flashArchSubtitle: 'Memory cell technology (TLC/QLC/SLC), DRAM/HMB caching, and hardware controller specs',
+    btnGlossary: 'QLC/TLC Educational Guide',
+    lblHwNand: 'Flash Cell Type',
+    lblHwCache: 'Cache Architecture',
+    lblHwSlc: 'Write Acceleration',
+    lblHwPe: 'P/E Cycle Rating',
+    lblHwSummaryTitle: 'Feature Purpose & Drive Characteristics:',
+    lblActiveFeatures: 'Active Hardware Features & Instructions:',
+    modalGlossaryTitle: 'Educational Guide: NAND Flash Technology & Disk Features',
+    modalGlossarySubtitle: 'Deep dive into QLC, TLC, MLC, SLC, DRAM, HMB, TRIM & SMR',
+    modalFooterTip: 'Press Esc or click button to close',
+    modalBtnClose: 'Close Guide',
   }
 };
 
@@ -301,6 +331,35 @@ function setLanguage(lang, triggerRender = true) {
   document.getElementById('txt-surface-subtitle').textContent = t.txtSurfaceSubtitle;
   document.getElementById('txt-repair-title').textContent = t.txtRepairTitle;
   document.getElementById('txt-repair-subtitle').textContent = t.txtRepairSubtitle;
+
+  const elLblNand = document.getElementById('lbl-nand-type');
+  if (elLblNand) elLblNand.textContent = t.lblNandType;
+  const elLblCache = document.getElementById('lbl-cache-type');
+  if (elLblCache) elLblCache.textContent = t.lblCacheType;
+  const elFlashTitle = document.getElementById('txt-flash-arch-title');
+  if (elFlashTitle) elFlashTitle.textContent = t.flashArchTitle;
+  const elFlashSub = document.getElementById('txt-flash-arch-subtitle');
+  if (elFlashSub) elFlashSub.textContent = t.flashArchSubtitle;
+  const elBtnGlossary = document.getElementById('txt-btn-glossary');
+  if (elBtnGlossary) elBtnGlossary.textContent = t.btnGlossary;
+  const elHwNandLbl = document.getElementById('lbl-hw-nand');
+  if (elHwNandLbl) elHwNandLbl.textContent = t.lblHwNand;
+  const elHwCacheLbl = document.getElementById('lbl-hw-cache');
+  if (elHwCacheLbl) elHwCacheLbl.textContent = t.lblHwCache;
+  const elHwSlcLbl = document.getElementById('lbl-hw-slc');
+  if (elHwSlcLbl) elHwSlcLbl.textContent = t.lblHwSlc;
+  const elHwPeLbl = document.getElementById('lbl-hw-pe');
+  if (elHwPeLbl) elHwPeLbl.textContent = t.lblHwPe;
+  const elHwSumTitle = document.getElementById('lbl-hw-summary-title');
+  if (elHwSumTitle) elHwSumTitle.textContent = t.lblHwSummaryTitle;
+  const elActFeatLbl = document.getElementById('lbl-active-features');
+  if (elActFeatLbl) elActFeatLbl.textContent = t.lblActiveFeatures;
+  const elModalTitle = document.getElementById('modal-glossary-title');
+  if (elModalTitle) elModalTitle.textContent = t.modalGlossaryTitle;
+  const elModalSub = document.getElementById('modal-glossary-subtitle');
+  if (elModalSub) elModalSub.textContent = t.modalGlossarySubtitle;
+  const elModalTip = document.getElementById('modal-footer-tip');
+  if (elModalTip) elModalTip.textContent = t.modalFooterTip;
 
   const themeText = document.getElementById('theme-text');
   if (themeText) {
@@ -483,6 +542,8 @@ function renderDriveTabs() {
 
     const driveLetters = disk.drive_letters_str || '-';
     const sizeGb = disk.size_gb || 0;
+    const hw = disk.hardware_profile || {};
+    const mediaBadge = hw.cell_tech_name ? (hw.cell_tech_name.includes('TLC') ? 'TLC' : (hw.cell_tech_name.includes('QLC') ? 'QLC' : (hw.cell_tech_name.includes('SMR') ? 'SMR' : disk.bus_type))) : disk.bus_type;
 
     return `
       <div onclick="selectDisk(${idx})" class="disk-tab-card ${isActive ? 'active' : ''}">
@@ -494,7 +555,7 @@ function renderDriveTabs() {
             <div class="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono flex items-center gap-1.5">
               <span class="font-bold text-blue-600 dark:text-blue-400">${sizeGb} GB</span>
               <span>•</span>
-              <span>${disk.bus_type}</span>
+              <span class="px-1 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-[10px]">${mediaBadge}</span>
               <span>•</span>
               <span class="font-bold text-zinc-700 dark:text-zinc-300">${driveLetters}</span>
             </div>
@@ -597,6 +658,28 @@ function renderActiveDisk() {
   document.getElementById('disk-interface-type').textContent = `${disk.media_type} (${disk.bus_type})`;
   document.getElementById('disk-drive-letters').textContent = disk.drive_letters_str || '-';
 
+  // Hardware Profile & NAND Telemetry
+  const hw = disk.hardware_profile || {};
+  const hwExpl = hw.explanation || {};
+  const hwFeatures = hw.features || [];
+
+  // Hero Badges (Interactive Flash & Cache chips)
+  const heroBadgesContainer = document.getElementById('disk-hero-badges');
+  if (heroBadgesContainer) {
+    let heroBadgesHtml = '';
+    if (hw.cell_tech_name) {
+      heroBadgesHtml += `<button onclick="openGlossaryModal()" class="cursor-pointer px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700 hover:scale-105 transition-transform" title="Klik untuk panduan edukasi sel flash">${hw.cell_tech_name}</button>`;
+    }
+    if (hw.dram_cache) {
+      const cacheShort = hw.dram_cache.includes('HMB') ? 'HMB (DMA)' : (hw.dram_cache.includes('Dedicated') ? 'DRAM Cache' : (hw.dram_cache.includes('256') ? '256MB DRAM' : 'SLC Cache'));
+      heroBadgesHtml += `<button onclick="openGlossaryModal()" class="cursor-pointer px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700 hover:scale-105 transition-transform" title="Klik untuk penjelasan arsitektur cache">${cacheShort}</button>`;
+    }
+    if (hwFeatures.some(f => f.tag === 'TRIM')) {
+      heroBadgesHtml += `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">TRIM</span>`;
+    }
+    heroBadgesContainer.innerHTML = heroBadgesHtml;
+  }
+
   // Jam Operasional
   const poh = disk.power_on_hours || 0;
   const years = (poh / 8760).toFixed(1);
@@ -608,12 +691,84 @@ function renderActiveDisk() {
   document.getElementById('spec-serial').textContent = disk.serial_number || '-';
   const interfaceSpeed = disk.bus_type === 'NVMe' ? 'PCIe NVMe' : `${disk.bus_type || 'SATA'} 6.0 Gb/s`;
   document.getElementById('spec-interface').textContent = interfaceSpeed;
+
+  const specNandElem = document.getElementById('spec-nand-type');
+  if (specNandElem) specNandElem.textContent = hw.cell_tech_name || (disk.media_type === 'SSD' ? '3D Flash' : 'Piringan Magnetik');
+
+  const specCacheElem = document.getElementById('spec-cache-type');
+  if (specCacheElem) {
+    const cacheSummary = hw.dram_cache ? (hw.dram_cache.includes('HMB') ? 'HMB (DMA)' : (hw.dram_cache.includes('Dedicated') ? 'Dedicated DRAM' : (hw.dram_cache.includes('256') ? '256MB DRAM' : 'SLC Caching'))) : '-';
+    specCacheElem.textContent = cacheSummary;
+  }
+
   document.getElementById('spec-poc').textContent = disk.power_on_count !== undefined ? t.pocText.replace('{0}', disk.power_on_count.toLocaleString()) : '-';
 
   const hostWritesTb = metrics.host_writes_tb !== undefined ? `${metrics.host_writes_tb} TB` : '-';
   const hostReadsTb = metrics.host_reads_tb !== undefined ? `${metrics.host_reads_tb} TB` : '-';
   document.getElementById('spec-reads').textContent = hostReadsTb;
   document.getElementById('spec-writes').textContent = hostWritesTb;
+
+  // 4 Pillars Flash & Hardware Grid
+  const elHwNand = document.getElementById('hw-nand-type');
+  if (elHwNand) elHwNand.textContent = hw.nand_type || disk.media_type;
+  const elHwNandSub = document.getElementById('hw-nand-sub');
+  if (elHwNandSub) elHwNandSub.textContent = hw.cell_tech_name || (disk.media_type === 'SSD' ? '3D NAND Flash' : 'Piringan Magnetik');
+
+  const elHwCache = document.getElementById('hw-cache-type');
+  if (elHwCache) elHwCache.textContent = hw.dram_cache ? (hw.dram_cache.includes('HMB') ? 'DRAM-less (HMB)' : (hw.dram_cache.includes('Dedicated') ? 'DRAM Dedicated' : (hw.dram_cache.includes('256') ? '256 MB DRAM' : 'DRAM-less (SLC Caching)'))) : '-';
+  const elHwCacheSub = document.getElementById('hw-cache-sub');
+  if (elHwCacheSub) elHwCacheSub.textContent = hw.controller_family || '-';
+
+  const elHwSlc = document.getElementById('hw-slc-type');
+  if (elHwSlc) elHwSlc.textContent = hw.slc_cache_type || (disk.media_type === 'SSD' ? 'Dynamic SLC Cache' : 'Track Buffer');
+  const elHwSlcSub = document.getElementById('hw-slc-sub');
+  if (elHwSlcSub) elHwSlcSub.textContent = hw.interface_standard || (disk.bus_type || 'SATA III');
+
+  const elHwPe = document.getElementById('hw-pe-cycles');
+  if (elHwPe) elHwPe.textContent = hw.durability_pe_cycles || '~1.500 P/E Cycles';
+  const elHwPeSub = document.getElementById('hw-pe-sub');
+  if (elHwPeSub) elHwPeSub.textContent = currentLang === 'en' ? 'Rated write endurance' : 'Batas ketahanan hapus-tulis';
+
+  // Hardware summary explanation
+  const elHwSummaryText = document.getElementById('hw-summary-text');
+  if (elHwSummaryText) {
+    const summary = currentLang === 'en' ? (hwExpl.summary_en || hwExpl.summary_id || '') : (hwExpl.summary_id || '');
+    elHwSummaryText.innerHTML = summary.replace(/\*\*(.*?)\*\*/g, '<strong class="text-zinc-900 dark:text-zinc-50">$1</strong>');
+  }
+
+  // Active hardware features badges
+  const elFeaturesContainer = document.getElementById('hw-features-container');
+  if (elFeaturesContainer) {
+    if (hwFeatures.length > 0) {
+      elFeaturesContainer.innerHTML = hwFeatures.map(feat => {
+        let colorClasses = 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700';
+        if (feat.badge_color === 'emerald') {
+          colorClasses = 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+        } else if (feat.badge_color === 'blue') {
+          colorClasses = 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+        } else if (feat.badge_color === 'purple') {
+          colorClasses = 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800';
+        } else if (feat.badge_color === 'amber') {
+          colorClasses = 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+        } else if (feat.badge_color === 'rose') {
+          colorClasses = 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
+        }
+
+        const name = currentLang === 'en' ? (feat.name_en || feat.name_id) : (feat.name_id || feat.name_en);
+        const desc = currentLang === 'en' ? (feat.desc_en || feat.desc_id) : (feat.desc_id || feat.desc_en);
+
+        return `
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-medium border ${colorClasses} select-none" title="${desc}">
+            <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+            <span class="font-bold">${feat.tag}</span>
+            <span class="text-[10px] opacity-75 hidden sm:inline">• ${name}</span>
+          </div>
+        `;
+      }).join('');
+    } else {
+      elFeaturesContainer.innerHTML = `<span class="text-xs text-zinc-500 font-mono">S.M.A.R.T, TRIM (Standard Features Active)</span>`;
+    }
+  }
 
   // Kapasitas Partisi
   const volumes = disk.volumes || [];
@@ -1130,3 +1285,40 @@ async function runDirtyCheckAction() {
     if (btn) btn.disabled = false;
   }
 }
+
+// Modal Glosarium & Panduan Edukasi NAND Flash
+function openGlossaryModal() {
+  const modal = document.getElementById('glossary-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+    safeCreateIcons();
+  }
+}
+
+function closeGlossaryModal() {
+  const modal = document.getElementById('glossary-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+  }
+}
+
+// Event listener ESC dan klik latar belakang modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeGlossaryModal();
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const modalElem = document.getElementById('glossary-modal');
+  if (modalElem) {
+    modalElem.addEventListener('click', (e) => {
+      if (e.target === modalElem) {
+        closeGlossaryModal();
+      }
+    });
+  }
+});
+

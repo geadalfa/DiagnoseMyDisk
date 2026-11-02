@@ -19,6 +19,7 @@ try:
         ATA_SMART_NAMES,
         NVME_SMART_NAMES,
     )
+    from hardware_profile import detect_hardware_profile
 except ImportError:
     from backend.smart_decoder import (
         decode_ata_smart_table,
@@ -27,6 +28,7 @@ except ImportError:
         ATA_SMART_NAMES,
         NVME_SMART_NAMES,
     )
+    from backend.hardware_profile import detect_hardware_profile
 
 SMART_CACHE_DIR = r"C:\Program Files\CrystalDiskInfo\Smart"
 
@@ -553,6 +555,8 @@ def collect_all_disks_data():
                     }
                 }
 
+        hw_profile = detect_hardware_profile(name, media_type, bus_type, size_gb, smart_attributes)
+
         results.append({
             "device_id": device_id,
             "name": name,
@@ -568,6 +572,7 @@ def collect_all_disks_data():
             "power_on_count": poc,
             "health_analysis": health_analysis,
             "smart_attributes": smart_attributes,
+            "hardware_profile": hw_profile,
             "is_admin": is_admin(),
         })
 
