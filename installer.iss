@@ -2,7 +2,7 @@
 ; Menghasilkan installer mandiri profesional: DiagnoseMyDisk_Setup.exe
 
 #define MyAppName "DiagnoseMyDisk"
-#define MyAppVersion "1.4.1"
+#define MyAppVersion "1.5.0"
 #define MyAppPublisher "Alfa & Gemi"
 #define MyAppExeName "DiagnoseMyDisk.exe"
 

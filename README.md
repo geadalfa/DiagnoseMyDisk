@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v1.4.1-emerald.svg?logo=github&logoColor=white" alt="Release v1.3.1"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v1.5.0-emerald.svg?logo=github&logoColor=white" alt="Release v1.5.0"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
   <a href="README.md"><img src="https://img.shields.io/badge/Architecture-Bad%20Sector%20%2B%20Drive%20Doctor-purple.svg" alt="Architecture"></a>
@@ -32,8 +32,8 @@ Tersedia versi siap pakai untuk Windows 10 & 11 (64-bit):
 
 | Paket Rilis | Deskripsi | Tautan Unduhan Langsung |
 | :--- | :--- | :--- |
-| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke sistem lokal, pembuatan shortcut desktop & start menu. Tanpa hak akses Administrator. | [**Unduh DiagnoseMyDisk_Setup.exe**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v1.4.1/DiagnoseMyDisk_Setup.exe) |
-| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan DiagnoseMyDisk.exe. | [**Unduh DiagnoseMyDisk-v1.4.1-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v1.4.1/DiagnoseMyDisk-v1.4.1-portable.zip) |
+| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke sistem lokal, pembuatan shortcut desktop & start menu. Tanpa hak akses Administrator. | [**Unduh DiagnoseMyDisk_Setup.exe**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v1.5.0/DiagnoseMyDisk_Setup.exe) |
+| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan DiagnoseMyDisk.exe. | [**Unduh DiagnoseMyDisk-v1.5.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v1.5.0/DiagnoseMyDisk-v1.5.0-portable.zip) |
 
 Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases).
 
