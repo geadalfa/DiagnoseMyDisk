@@ -45,6 +45,10 @@ from collector import collect_all_disks_data, is_admin
 from hardware_profile import get_flash_technology_glossary
 import scanner
 import storage_manager
+try:
+    from backend import app_logger
+except ImportError:
+    import app_logger
 
 PORT = 5550
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -151,12 +155,38 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
 
         elif parsed_path.path == "/api/storage/start_scan":
             try:
-                drive_letters = body_data.get("drives", ["all"])
+                drive_input = body_data.get("drives") or body_data.get("drive") or "all"
+                if isinstance(drive_input, str):
+                    drive_letters = [drive_input]
+                else:
+                    drive_letters = list(drive_input)
+
                 scan_duplicates = body_data.get("scan_duplicates", True)
-                min_large_mb = body_data.get("min_large_mb", 100)
+                min_large_mb = body_data.get("min_large_mb", 50)
                 sm = storage_manager.get_storage_manager()
                 ok, msg = sm.start_scan(drive_letters, scan_duplicates, min_large_mb)
                 self._send_json({"success": ok, "message": msg})
+            except Exception as e:
+                app_logger.log_error("Server", f"Failed to start storage scan: {e}")
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/open_log_file":
+            try:
+                log_path = app_logger.get_log_file_path()
+                if os.path.exists(log_path):
+                    os.startfile(log_path)
+                    self._send_json({"success": True, "message": "Log file opened in system editor."})
+                else:
+                    self._send_json({"success": False, "error": "Log file not created yet."})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/clear_logs":
+            try:
+                app_logger.clear_logs()
+                self._send_json({"success": True, "message": "Logs cleared."})
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=500)
             return
@@ -312,6 +342,15 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 res = dict(sm.results)
                 res["success"] = True
                 self._send_json(res)
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/logs":
+            try:
+                recent = app_logger.get_recent_logs(300)
+                log_path = app_logger.get_log_file_path()
+                self._send_json({"success": True, "logs": recent, "log_file": log_path})
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=500)
             return

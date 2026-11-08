@@ -82,6 +82,14 @@ class TestServerRoutesIntegration(unittest.TestCase):
         self.assertTrue(data.get("success"))
         self.assertEqual(data.get("deleted_count"), 0)
 
+    def test_api_logs(self):
+        """Test GET /api/logs."""
+        data = self._get_json("/api/logs")
+        self.assertTrue(data.get("success"))
+        self.assertIn("logs", data)
+        self.assertIn("log_file", data)
+        self.assertIsInstance(data["logs"], list)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1630,7 +1630,7 @@ async function checkStorageScanStatus() {
 // 4. Trigger Scan
 async function triggerStorageScan() {
   const select = document.getElementById('storage-drive-select');
-  const drive = select ? select.value : 'all';
+  const drive = selectedStorageDrive || (select ? select.value : 'all');
 
   const btnScan = document.getElementById('btn-storage-scan');
   const txtScan = document.getElementById('txt-btn-storage-scan');
@@ -1641,7 +1641,7 @@ async function triggerStorageScan() {
     const res = await fetch('/api/storage/start_scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ drive })
+      body: JSON.stringify({ drive: drive, drives: [drive] })
     });
     const data = await res.json();
     if (data.success) {
@@ -1718,11 +1718,11 @@ function startStoragePolling() {
 }
 
 function updateStorageProgressBar(st) {
-  const pBar = document.getElementById('storage-progress-fill');
-  const pPct = document.getElementById('storage-progress-percentage');
+  const pBar = document.getElementById('storage-progress-fill') || document.getElementById('storage-progress-bar');
+  const pPct = document.getElementById('storage-progress-pct') || document.getElementById('storage-progress-percentage');
   const pStatus = document.getElementById('storage-progress-status');
   const pPath = document.getElementById('storage-progress-path');
-  const pCount = document.getElementById('storage-progress-count');
+  const pCount = document.getElementById('storage-progress-stats') || document.getElementById('storage-progress-count');
 
   const pct = Math.max(0, Math.min(100, st.progress || 0));
   if (pBar) pBar.style.width = `${pct}%`;
@@ -1732,7 +1732,7 @@ function updateStorageProgressBar(st) {
   if (pCount) {
     const filesStr = (st.files_scanned || 0).toLocaleString();
     const bytesStr = formatStorageBytes(st.bytes_scanned || 0);
-    pCount.textContent = `${filesStr} berkas (${bytesStr}) terindeks`;
+    pCount.textContent = `${filesStr} berkas (${bytesStr})`;
   }
 }
 
@@ -2349,5 +2349,131 @@ document.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeDriveDropdown();
+    closeLogsModal();
   }
 });
+
+
+// ==============================================================================
+// APPLICATION LOGS & DIAGNOSTICS CONTROLLER (v2.0.0)
+// ==============================================================================
+let appLogsPollTimer = null;
+
+async function openLogsModal() {
+  const modal = document.getElementById('modal-app-logs');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  document.body.classList.add('overflow-hidden');
+  safeCreateIcons();
+
+  await fetchAppLogs();
+  if (!appLogsPollTimer) {
+    appLogsPollTimer = setInterval(fetchAppLogs, 1500);
+  }
+}
+
+function closeLogsModal() {
+  const modal = document.getElementById('modal-app-logs');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  document.body.classList.remove('overflow-hidden');
+
+  if (appLogsPollTimer) {
+    clearInterval(appLogsPollTimer);
+    appLogsPollTimer = null;
+  }
+}
+
+async function fetchAppLogs() {
+  try {
+    const res = await fetch('/api/logs');
+    const data = await res.json();
+    if (data.success && data.logs) {
+      renderAppLogs(data.logs, data.log_file);
+    }
+  } catch (err) {
+    console.error('Failed to fetch app logs:', err);
+  }
+}
+
+function renderAppLogs(logs, logFilePath) {
+  const consoleElem = document.getElementById('app-logs-console');
+  const countElem = document.getElementById('app-logs-count');
+  const pathElem = document.getElementById('app-logs-file-path');
+  const chkAutoScroll = document.getElementById('chk-auto-scroll-logs');
+
+  if (pathElem && logFilePath) {
+    pathElem.textContent = `File: ${logFilePath}`;
+    pathElem.title = logFilePath;
+  }
+  if (countElem) {
+    countElem.textContent = `${logs.length} entri`;
+  }
+  if (!consoleElem) return;
+
+  if (logs.length === 0) {
+    consoleElem.innerHTML = '<div class="text-zinc-500 py-4 text-center">Belum ada catatan log aplikasi.</div>';
+    return;
+  }
+
+  let html = '';
+  logs.forEach((log) => {
+    const lvl = (log.level || 'INFO').toUpperCase();
+    let badgeColor = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+    if (lvl === 'WARN') {
+      badgeColor = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+    } else if (lvl === 'ERROR') {
+      badgeColor = 'text-rose-400 bg-rose-500/10 border-rose-500/20';
+    }
+
+    html += `
+      <div class="flex items-start gap-2 hover:bg-zinc-900/60 p-0.5 rounded transition-colors text-[11px] font-mono leading-tight">
+        <span class="text-zinc-500 shrink-0 text-[10px] tabular-nums">${log.timestamp || ''}</span>
+        <span class="px-1 py-0.2 rounded text-[9px] font-bold border shrink-0 ${badgeColor}">${lvl}</span>
+        <span class="text-purple-400 font-semibold shrink-0 text-[10px]">[${escapeHtml(log.component || 'App')}]</span>
+        <span class="text-zinc-200 break-all select-text">${escapeHtml(log.message || '')}</span>
+      </div>`;
+  });
+
+  consoleElem.innerHTML = html;
+
+  if (chkAutoScroll && chkAutoScroll.checked) {
+    consoleElem.scrollTop = consoleElem.scrollHeight;
+  }
+}
+
+async function copyLogsToClipboard() {
+  try {
+    const res = await fetch('/api/logs');
+    const data = await res.json();
+    if (data.success && data.logs) {
+      const textLines = data.logs.map(l => `[${l.timestamp}] [${l.level}] [${l.component}] ${l.message}`).join('\n');
+      await navigator.clipboard.writeText(textLines);
+      alert(`Berhasil menyalin ${data.logs.length} baris log ke clipboard!`);
+    }
+  } catch (err) {
+    alert(`Gagal menyalin log: ${err.message}`);
+  }
+}
+
+async function openLogFileInNotepad() {
+  try {
+    const res = await fetch('/api/open_log_file', { method: 'POST' });
+    const data = await res.json();
+    if (!data.success) {
+      alert(`Gagal membuka file log: ${data.error}`);
+    }
+  } catch (err) {
+    alert(`Kesalahan membuka file log: ${err.message}`);
+  }
+}
+
+async function clearAppLogs() {
+  if (!confirm('Bersihkan seluruh log saat ini?')) return;
+  try {
+    await fetch('/api/clear_logs', { method: 'POST' });
+    await fetchAppLogs();
+  } catch (err) {
+    console.error('Failed to clear logs:', err);
+  }
+}

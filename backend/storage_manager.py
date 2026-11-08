@@ -11,7 +11,26 @@ import hashlib
 import threading
 import subprocess
 import shutil
+import ctypes
 from datetime import datetime
+
+try:
+    from backend import app_logger
+except ImportError:
+    import app_logger
+
+# System directories that must be excluded from recursive scanning & duplicate analysis
+SYSTEM_EXCLUDED_NAMES = {
+    "windows",
+    "windowsapps",
+    "$recycle.bin",
+    "system volume information",
+    "recovery",
+    "boot",
+    "msocache",
+    "$windows.~bt",
+    "$windows.~ws"
+}
 
 # Windows File Attribute Flag
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
@@ -48,7 +67,6 @@ def get_available_drives():
     """Mengambil daftar seluruh drive lokal Windows yang tersedia dan siap diakses."""
     drives = []
     if os.name == "nt":
-        import ctypes
         bitmask = ctypes.windll.kernel32.GetLogicalDrives()
         for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
             if bitmask & 1:
@@ -136,9 +154,10 @@ class StorageManager:
                 return True
         return False
 
-    def start_scan(self, drive_letters=None, scan_duplicates=True, min_large_mb=100):
+    def start_scan(self, drive_letters=None, scan_duplicates=True, min_large_mb=100, min_dup_bytes=512*1024):
         with self.lock:
             if self.is_scanning:
+                app_logger.log_warn("StorageManager", "Scan request rejected: scan already in progress.")
                 return False, "Pemindaian sedang berjalan."
 
             self.is_scanning = True
@@ -149,15 +168,17 @@ class StorageManager:
             self.status_text = "Menyiapkan pemindaian..."
             self.start_time = time.time()
 
+        app_logger.log_info("StorageManager", f"Scan initiated. Target drives: {drive_letters}, duplicates: {scan_duplicates}, min_large_mb: {min_large_mb}")
+
         self.scan_thread = threading.Thread(
             target=self._run_scan_worker,
-            args=(drive_letters, scan_duplicates, min_large_mb),
+            args=(drive_letters, scan_duplicates, min_large_mb, min_dup_bytes),
             daemon=True
         )
         self.scan_thread.start()
         return True, "Pemindaian dimulai."
 
-    def _run_scan_worker(self, drive_letters, scan_duplicates=True, min_large_mb=50):
+    def _run_scan_worker(self, drive_letters, scan_duplicates=True, min_large_mb=50, min_dup_bytes=512*1024):
         try:
             all_drives = get_available_drives()
             target_drives = []
@@ -224,6 +245,11 @@ class StorageManager:
                         if is_reparse_point(entry):
                             continue
 
+                        low_name = entry.name.lower()
+                        if low_name in SYSTEM_EXCLUDED_NAMES:
+                            app_logger.log_info("StorageManager", f"Skipping protected system directory: {entry.path}")
+                            continue
+
                         if entry.is_dir(follow_symlinks=False):
                             dir_size, dir_files, dir_mtime = self._scan_directory_recursive(
                                 entry.path,
@@ -233,7 +259,8 @@ class StorageManager:
                                 old_items=old_items,
                                 size_candidates=size_candidates if scan_duplicates else None,
                                 min_large_bytes=min_large_bytes,
-                                now=now
+                                now=now,
+                                min_dup_bytes=min_dup_bytes
                             )
                             if dir_size >= min_large_bytes:
                                 large_items.append({
@@ -267,7 +294,7 @@ class StorageManager:
                                         "drive": drv["drive"],
                                         "age_days": int((now - mtime) / one_day)
                                     })
-                                if scan_duplicates and sz >= 1024:  # Cek duplikat >= 1 KB
+                                if scan_duplicates and sz >= min_dup_bytes:  # Cek duplikat >= min_dup_bytes
                                     size_candidates.setdefault(sz, []).append((entry.path, mtime))
                             except (PermissionError, OSError):
                                 pass
@@ -325,7 +352,7 @@ class StorageManager:
                 self.progress = 100
                 self.is_scanning = False
 
-    def _scan_directory_recursive(self, path, max_depth, current_depth, large_items, old_items, size_candidates, min_large_bytes, now):
+    def _scan_directory_recursive(self, path, max_depth, current_depth, large_items, old_items, size_candidates, min_large_bytes, now, min_dup_bytes=512*1024):
         """Pemindaian rekursif terkontrol dengan proteksi loop junction point dan pembaruan telemetri."""
         if self.cancel_requested or current_depth > max_depth:
             return 0, 0, 0
@@ -393,16 +420,20 @@ class StorageManager:
                                 })
 
                             # Kandidat duplikat
-                            if size_candidates is not None and sz >= 1024:
+                            if size_candidates is not None and sz >= min_dup_bytes:
                                 size_candidates.setdefault(sz, []).append((p, mtime))
 
                         except (PermissionError, OSError):
                             pass
 
                     elif entry.is_dir(follow_symlinks=False):
+                        low_sub = entry.name.lower()
+                        if low_sub in SYSTEM_EXCLUDED_NAMES:
+                            continue
+
                         sub_sz, sub_cnt, sub_mtime = self._scan_directory_recursive(
                             p, max_depth, current_depth + 1,
-                            large_items, old_items, size_candidates, min_large_bytes, now
+                            large_items, old_items, size_candidates, min_large_bytes, now, min_dup_bytes
                         )
                         total_size += sub_sz
                         total_files += sub_cnt
@@ -428,41 +459,80 @@ class StorageManager:
         return total_size, total_files, latest_mtime
 
     def _find_duplicates_from_candidates(self, size_candidates):
-        """Deteksi 2 tahap (Header Chunk Hash 4KB -> Full Hash SHA-256) untuk kecepatan maksimal."""
+        """Deteksi 2 tahap (Header Chunk Hash 4KB -> Full Hash SHA-256) dengan telemetri live & prioritas ukuran."""
         duplicates_groups = []
-        # Ambil hanya ukuran dengan >= 2 berkas
+        if not size_candidates:
+            return duplicates_groups
+
         potential_groups = [files for sz, files in size_candidates.items() if len(files) >= 2]
+        if not potential_groups:
+            return duplicates_groups
+
+        # Sortir kelompok berdasarkan ukuran file menurun (prioritaskan pembebasan ruang terbesar)
+        def _get_group_size(flist):
+            try:
+                return os.path.getsize(flist[0][0])
+            except Exception:
+                return 0
+
+        potential_groups.sort(key=_get_group_size, reverse=True)
+        # Batasi analisis ke 250 kelompok berkas teratas agar tidak membebani I/O
+        potential_groups = potential_groups[:250]
         total_groups = len(potential_groups)
+
+        app_logger.log_info("StorageManager", f"Menganalisis duplikat untuk {total_groups} kelompok kandidat berkas.")
 
         for g_idx, file_list in enumerate(potential_groups):
             if self.cancel_requested:
+                app_logger.log_info("StorageManager", "Analisis duplikat dibatalkan oleh pengguna.")
                 break
+
+            # Update live telemetry on EVERY group so UI is always fluid
+            with self.lock:
+                self.progress = 80 + int((g_idx / max(1, total_groups)) * 18)
+                first_name = os.path.basename(file_list[0][0]) if file_list else ""
+                self.current_path = f"[Duplikat {g_idx+1}/{total_groups}] {first_name}"
+                self.status_text = f"Menganalisis berkas duplikat ({g_idx+1}/{total_groups})..."
+
+            if (g_idx + 1) % 20 == 0 or g_idx == 0:
+                app_logger.log_info("StorageManager", f"Memproses kelompok duplikat {g_idx+1}/{total_groups}: {file_list[0][0]}")
 
             # Tahap 1: Bandingkan 4KB pertama
             chunk_buckets = {}
             for path, mtime in file_list:
+                if self.cancel_requested:
+                    break
                 try:
                     with open(path, "rb") as f:
                         header = f.read(4096)
                     h = hashlib.md5(header).hexdigest()
                     chunk_buckets.setdefault(h, []).append((path, mtime))
-                except Exception:
-                    pass
+                except Exception as e:
+                    app_logger.log_warn("StorageManager", f"Lewati berkas tidak dapat diakses (Header Hash): {path} ({e})")
+
+            if self.cancel_requested:
+                break
 
             # Tahap 2: Untuk yang header cocok, hitung full SHA-256
             for h_val, candidate_list in chunk_buckets.items():
+                if self.cancel_requested:
+                    break
                 if len(candidate_list) >= 2:
                     full_hash_buckets = {}
                     for path, mtime in candidate_list:
+                        if self.cancel_requested:
+                            break
                         try:
                             hasher = hashlib.sha256()
                             with open(path, "rb") as f:
                                 while chunk := f.read(65536):
                                     hasher.update(chunk)
+                                    if self.cancel_requested:
+                                        break
                             full_h = hasher.hexdigest()
                             full_hash_buckets.setdefault(full_h, []).append((path, mtime))
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            app_logger.log_warn("StorageManager", f"Lewati berkas saat Full Hash: {path} ({e})")
 
                     for full_h, matched_files in full_hash_buckets.items():
                         if len(matched_files) >= 2:
@@ -476,28 +546,23 @@ class StorageManager:
                             for p, mt in matched_files:
                                 items.append({
                                     "path": p,
-                                    "name": os.path.basename(p),
                                     "mtime": mt,
-                                    "mtime_str": datetime.fromtimestamp(mt).strftime("%Y-%m-%d %H:%M:%S") if mt else "-",
-                                    "drive": p[:2] if len(p) >= 2 and p[1] == ":" else ""
+                                    "mtime_str": datetime.fromtimestamp(mt).strftime("%Y-%m-%d %H:%M"),
+                                    "size": sz,
+                                    "size_formatted": format_bytes(sz)
                                 })
 
-                            # Urutkan berdasarkan waktu modifikasi (terbaru pertama)
-                            items.sort(key=lambda x: x["mtime"], reverse=True)
-
                             duplicates_groups.append({
-                                "hash": full_h,
+                                "file_name": os.path.basename(matched_files[0][0]),
+                                "hash": full_h[:12],
                                 "size": sz,
                                 "size_formatted": format_bytes(sz),
-                                "total_wasted": sz * (len(items) - 1),
-                                "total_wasted_formatted": format_bytes(sz * (len(items) - 1)),
-                                "count": len(items),
+                                "count": len(matched_files),
                                 "files": items
                             })
 
-        # Urutkan grup duplikat berdasarkan total ruang terbuang terbesar
-        duplicates_groups.sort(key=lambda x: x["total_wasted"], reverse=True)
-        return duplicates_groups[:100]
+        app_logger.log_info("StorageManager", f"Analisis duplikat selesai. Ditemukan {len(duplicates_groups)} kelompok duplikat.")
+        return duplicates_groups
 
     def _collect_cleanup_recommendations(self, target_drives):
         """Memeriksa target cache, log, dan sampah yang 100% aman dibersihkan pada drive target."""

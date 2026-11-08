@@ -118,7 +118,7 @@ class TestStorageManagerEngine(unittest.TestCase):
         """Test that scanning finds the files and identifies duplicates."""
         # Run scan worker on test sandbox with min_large_mb=0 to catch test files
         drives_to_scan = [self.test_dir]
-        self.mgr._run_scan_worker(drives_to_scan, scan_duplicates=True, min_large_mb=0)
+        self.mgr._run_scan_worker(drives_to_scan, scan_duplicates=True, min_large_mb=0, min_dup_bytes=1024)
 
         status = self.mgr.get_status()
         self.assertFalse(status["is_scanning"])
