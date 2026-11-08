@@ -404,15 +404,19 @@ function enableDarkTheme(enable) {
 
   if (isDarkTheme) {
     root.classList.add('dark');
+    root.style.colorScheme = 'dark';
     body.classList.add('dark');
     body.classList.add('dark-theme');
+    body.style.colorScheme = 'dark';
     localStorage.setItem('diagnose_theme', 'dark');
     if (themeIcon) themeIcon.setAttribute('data-lucide', 'moon');
     if (themeText) themeText.textContent = t.themeDark;
   } else {
     root.classList.remove('dark');
+    root.style.colorScheme = 'light';
     body.classList.remove('dark');
     body.classList.remove('dark-theme');
+    body.style.colorScheme = 'light';
     localStorage.setItem('diagnose_theme', 'light');
     if (themeIcon) themeIcon.setAttribute('data-lucide', 'sun');
     if (themeText) themeText.textContent = t.themeLight;
@@ -1407,31 +1411,124 @@ async function loadStorageDrives() {
   }
 }
 
-// Render drive selector dropdown
+// Toggle & Close Custom Drive Dropdown (Zero White Flash Invariant)
+function toggleDriveDropdown() {
+  const menu = document.getElementById('drive-dropdown-menu');
+  const chevron = document.getElementById('icon-drive-dropdown-chevron');
+  if (!menu) return;
+
+  const isHidden = menu.classList.contains('hidden');
+  if (isHidden) {
+    menu.classList.remove('hidden');
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+  } else {
+    menu.classList.add('hidden');
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  }
+}
+
+function closeDriveDropdown() {
+  const menu = document.getElementById('drive-dropdown-menu');
+  const chevron = document.getElementById('icon-drive-dropdown-chevron');
+  if (menu && !menu.classList.contains('hidden')) {
+    menu.classList.add('hidden');
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  }
+}
+
+function selectStorageDrive(val) {
+  selectedStorageDrive = val;
+  const select = document.getElementById('storage-drive-select');
+  if (select) select.value = val;
+
+  renderStorageDriveDropdown();
+  updateDriveUsageHero();
+  if (storageResults) {
+    renderStorageResults(storageResults);
+  }
+  closeDriveDropdown();
+}
+
+// Render drive selector dropdown (Supports both Custom Dropdown and hidden native select)
 function renderStorageDriveDropdown() {
   const select = document.getElementById('storage-drive-select');
-  if (!select) return;
+  const list = document.getElementById('drive-dropdown-list');
+  const txtSelected = document.getElementById('txt-selected-drive');
 
-  const currentVal = select.value || 'all';
-  select.innerHTML = '<option value="all">Semua Disk (All Disks)</option>';
+  const currentVal = selectedStorageDrive || (select ? select.value : 'all');
 
-  storageDrives.forEach((drv) => {
-    const opt = document.createElement('option');
-    opt.value = drv.drive;
-    const freeStr = formatStorageBytes(drv.free);
-    const totalStr = formatStorageBytes(drv.total);
-    opt.textContent = `${drv.drive} (${freeStr} bebas / ${totalStr})`;
-    select.appendChild(opt);
-  });
+  // 1. Synchronize hidden native select
+  if (select) {
+    select.innerHTML = '<option value="all">Semua Disk (All Disks)</option>';
+    storageDrives.forEach((drv) => {
+      const opt = document.createElement('option');
+      opt.value = drv.drive;
+      const freeStr = formatStorageBytes(drv.free);
+      const totalStr = formatStorageBytes(drv.total);
+      opt.textContent = `${drv.drive} (${freeStr} bebas / ${totalStr})`;
+      select.appendChild(opt);
+    });
+    select.value = currentVal;
+    select.onchange = (e) => {
+      selectStorageDrive(e.target.value);
+    };
+  }
 
-  select.value = currentVal;
-  select.onchange = (e) => {
-    selectedStorageDrive = e.target.value;
-    updateDriveUsageHero();
-    if (storageResults) {
-      renderStorageResults(storageResults);
+  // 2. Render high-taste custom dropdown popover list
+  if (list) {
+    let listHtml = '';
+    const isAllActive = currentVal === 'all';
+
+    // Option: Semua Disk (All Disks)
+    listHtml += `
+      <button type="button" onclick="selectStorageDrive('all')" class="w-full flex items-center justify-between px-3 py-2 rounded-md text-xs transition-colors app-dropdown-item ${isAllActive ? 'active' : ''}">
+        <div class="flex items-center gap-2.5 truncate">
+          <i data-lucide="hard-drive" class="w-4 h-4 text-blue-500 shrink-0"></i>
+          <div class="text-left">
+            <div class="font-mono font-bold text-zinc-900 dark:text-zinc-100">Semua Disk</div>
+            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 font-sans">Pindai seluruh kapasitas penyimpanan komputer</div>
+          </div>
+        </div>
+        ${isAllActive ? '<i data-lucide="check" class="w-4 h-4 text-blue-500 shrink-0"></i>' : ''}
+      </button>`;
+
+    let activeLabelText = 'Semua Disk (All Disks)';
+
+    // Individual Drives
+    storageDrives.forEach((drv) => {
+      const isDriveActive = currentVal.toUpperCase() === drv.drive.toUpperCase();
+      const freeStr = formatStorageBytes(drv.free);
+      const totalStr = formatStorageBytes(drv.total);
+      const pctUsed = drv.percent || drv.percent_used || 0;
+
+      if (isDriveActive) {
+        activeLabelText = `${drv.drive} (${freeStr} bebas / ${totalStr})`;
+      }
+
+      listHtml += `
+        <button type="button" onclick="selectStorageDrive('${escapePath(drv.drive)}')" class="w-full flex items-center justify-between px-3 py-2 rounded-md text-xs transition-colors app-dropdown-item ${isDriveActive ? 'active' : ''}">
+          <div class="flex items-center gap-2.5 truncate">
+            <i data-lucide="disc" class="w-4 h-4 text-emerald-500 shrink-0"></i>
+            <div class="text-left">
+              <div class="flex items-center gap-1.5 font-mono">
+                <span class="font-bold text-zinc-900 dark:text-zinc-100">${escapeHtml(drv.drive)}</span>
+                <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">${freeStr} bebas</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">Total ${totalStr} · Terpakai ${pctUsed}%</div>
+            </div>
+          </div>
+          ${isDriveActive ? '<i data-lucide="check" class="w-4 h-4 text-blue-500 shrink-0"></i>' : ''}
+        </button>`;
+    });
+
+    list.innerHTML = listHtml;
+
+    if (txtSelected) {
+      txtSelected.textContent = activeLabelText;
     }
-  };
+
+    safeCreateIcons();
+  }
 }
 
 // Update PC Manager segmented bar and numbers
@@ -2238,3 +2335,19 @@ function escapePath(str) {
   if (!str) return '';
   return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
+
+
+// Event listener klik di luar dropdown untuk menutup popover drive selector
+document.addEventListener('click', (e) => {
+  const wrapper = document.getElementById('dropdown-drive-wrapper');
+  if (wrapper && !wrapper.contains(e.target)) {
+    closeDriveDropdown();
+  }
+});
+
+// Event listener ESC untuk menutup popover
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeDriveDropdown();
+  }
+});

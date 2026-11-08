@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DiagnoseMyDisk - Diagnostik Kesehatan, Bad Sector & Telemetri S.M.A.R.T</title>
+  <meta name="color-scheme" content="light dark">
   
   <!-- Favicon & PWA Icons -->
   <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -16,10 +17,13 @@
   <script>
     try {
       const savedTheme = localStorage.getItem('diagnose_theme');
-      if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
         document.documentElement.classList.add('dark');
+        document.documentElement.style.colorScheme = 'dark';
       } else {
         document.documentElement.classList.remove('dark');
+        document.documentElement.style.colorScheme = 'light';
       }
     } catch (e) {}
   </script>
@@ -27,7 +31,7 @@
   <!-- Offline Native Desktop Assets (Zero External CDN Dependency) -->
   <script src="tailwind.min.js"></script>
   <script src="lucide.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=1.5.0">
+  <link rel="stylesheet" href="style.css?v=2.0.0">
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -656,12 +660,27 @@
 
             <!-- Target Drive Selector & Scan Button -->
             <div class="flex items-center gap-2 flex-wrap">
-              <div class="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700 text-xs">
-                <i data-lucide="disc" class="w-3.5 h-3.5 text-zinc-500"></i>
-                <label for="storage-drive-select" class="text-zinc-500 font-medium" id="lbl-storage-drive">Target:</label>
-                <select id="storage-drive-select" class="bg-transparent font-mono font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer">
+              <!-- Custom High-Taste Dropdown for Target Drive (Anti-Slop Dark Mode) -->
+              <div class="relative" id="dropdown-drive-wrapper">
+                <!-- Hidden native select for backwards-compatibility & tests -->
+                <select id="storage-drive-select" class="hidden">
                   <option value="all">Semua Disk (All Disks)</option>
                 </select>
+
+                <!-- Custom Dropdown Trigger Button -->
+                <button type="button" id="btn-drive-dropdown-trigger" onclick="toggleDriveDropdown()" class="app-dropdown-trigger flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-mono font-semibold transition-all shadow-xs" title="Pilih target disk">
+                  <i data-lucide="disc" class="w-3.5 h-3.5 text-blue-500 shrink-0"></i>
+                  <span class="text-zinc-500 dark:text-zinc-400 font-sans font-medium text-[11px]" id="lbl-storage-drive">Target:</span>
+                  <span id="txt-selected-drive" class="font-bold text-zinc-900 dark:text-zinc-100 max-w-[210px] truncate">Semua Disk (All Disks)</span>
+                  <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-0.5 transition-transform duration-200" id="icon-drive-dropdown-chevron"></i>
+                </button>
+
+                <!-- Custom Dropdown Popover Menu -->
+                <div id="drive-dropdown-menu" class="hidden absolute left-0 mt-1.5 w-72 rounded-lg shadow-xl z-50 overflow-hidden border app-dropdown-menu transition-all">
+                  <div class="p-1.5 space-y-0.5 max-h-64 overflow-y-auto" id="drive-dropdown-list">
+                    <!-- Populated dynamically via renderStorageDriveDropdown() -->
+                  </div>
+                </div>
               </div>
 
               <button onclick="triggerStorageScan()" id="btn-storage-scan" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-all active:scale-95">
@@ -693,11 +712,11 @@
 
             <!-- Segmented Bar Legend -->
             <div class="flex items-center justify-between gap-2 text-[11px] font-mono text-zinc-500 dark:text-zinc-400 flex-wrap pt-0.5">
-              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span><span id="lbl-seg-user">Berkas Pengguna</span> <span id="val-seg-user" class="tabular-nums font-bold text-zinc-700 dark:text-zinc-300">(--)</span></div>
-              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span><span id="lbl-seg-app">Aplikasi</span> <span id="val-seg-app" class="tabular-nums font-bold text-zinc-700 dark:text-zinc-300">(--)</span></div>
-              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span><span id="lbl-seg-system">Sistem Windows</span> <span id="val-seg-system" class="tabular-nums font-bold text-zinc-700 dark:text-zinc-300">(--)</span></div>
-              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span><span id="lbl-seg-recycle">Tempat Sampah</span> <span id="val-seg-recycle" class="tabular-nums font-bold text-zinc-700 dark:text-zinc-300">(--)</span></div>
-              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-zinc-500"></span><span id="lbl-seg-other">Lainnya / Cache</span> <span id="val-seg-other" class="tabular-nums font-bold text-zinc-700 dark:text-zinc-300">(--)</span></div>
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span><span id="lbl-seg-user">Berkas Pengguna</span> <span id="val-seg-user" class="tabular-nums font-bold text-zinc-800 dark:text-zinc-100">(--)</span></div>
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span><span id="lbl-seg-app">Aplikasi</span> <span id="val-seg-app" class="tabular-nums font-bold text-zinc-800 dark:text-zinc-100">(--)</span></div>
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span><span id="lbl-seg-system">Sistem Windows</span> <span id="val-seg-system" class="tabular-nums font-bold text-zinc-800 dark:text-zinc-100">(--)</span></div>
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span><span id="lbl-seg-recycle">Tempat Sampah</span> <span id="val-seg-recycle" class="tabular-nums font-bold text-zinc-800 dark:text-zinc-100">(--)</span></div>
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-zinc-500"></span><span id="lbl-seg-other">Lainnya / Cache</span> <span id="val-seg-other" class="tabular-nums font-bold text-zinc-800 dark:text-zinc-100">(--)</span></div>
             </div>
           </div>
 
