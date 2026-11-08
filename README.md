@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v1.5.0-emerald.svg?logo=github&logoColor=white" alt="Release v1.5.0"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v2.0.0-emerald.svg?logo=github&logoColor=white" alt="Release v2.0.0"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
   <a href="README.md"><img src="https://img.shields.io/badge/Architecture-Bad%20Sector%20%2B%20Drive%20Doctor-purple.svg" alt="Architecture"></a>

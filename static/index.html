@@ -58,7 +58,7 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="text-sm font-black tracking-tight text-zinc-900 dark:text-zinc-50">Diagnose<span class="text-blue-600 dark:text-blue-400">MyDisk</span></span>
-            <span class="px-1.5 py-0.2 text-[10px] font-mono font-bold rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700">v1.5.0</span>
+            <span class="px-1.5 py-0.2 text-[10px] font-mono font-bold rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700">v2.0.0</span>
             
             <!-- Admin Status Badge -->
             <div id="admin-badge-container" class="flex items-center gap-1.5 pl-1.5">
@@ -66,7 +66,7 @@
               <span id="lbl-admin-status" class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 font-mono">Admin OK</span>
             </div>
           </div>
-          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 hidden md:block" id="header-subtitle">Verifikasi Kesehatan Sebenarnya, Pindai Bad Sector & Telemetri S.M.A.R.T</p>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 hidden md:block" id="header-subtitle">Verifikasi Kesehatan Sebenarnya, Bad Sector, Telemetri S.M.A.R.T & Manajemen Penyimpanan</p>
         </div>
       </div>
 
@@ -86,6 +86,10 @@
           <button id="btn-mode-scanner" onclick="setMode('scanner')" class="flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-all text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
             <i data-lucide="activity" class="w-3.5 h-3.5 text-rose-500"></i>
             <span id="txt-mode-scanner">Pindai Sektor & Pemulihan</span>
+          </button>
+          <button id="btn-mode-storage" onclick="setMode('storage')" class="flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-all text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
+            <i data-lucide="hard-drive-download" class="w-3.5 h-3.5 text-emerald-500"></i>
+            <span id="txt-mode-storage">Penyimpanan & Bersih</span>
           </button>
         </div>
 
@@ -633,6 +637,279 @@
         </div>
 
       </div>
+
+      <!-- VIEW 4: STORAGE MANAGEMENT & SMART CLEANUP -->
+      <div id="view-storage" class="hidden space-y-3.5">
+
+        <!-- 1. STORAGE DASHBOARD & SEGMENTED CAPACITY HERO CARD -->
+        <div class="app-surface p-4 space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                <i data-lucide="hard-drive-download" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider" id="txt-storage-title">Manajemen & Analisis Penyimpanan Disk</h3>
+                <p class="text-[11px] text-zinc-500 dark:text-zinc-400" id="txt-storage-subtitle">Pindai seluruh disk, temukan berkas duplikat, filter berkas besar/lawas, dan bersihkan cache sistem</p>
+              </div>
+            </div>
+
+            <!-- Target Drive Selector & Scan Button -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <div class="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700 text-xs">
+                <i data-lucide="disc" class="w-3.5 h-3.5 text-zinc-500"></i>
+                <label for="storage-drive-select" class="text-zinc-500 font-medium" id="lbl-storage-drive">Target:</label>
+                <select id="storage-drive-select" class="bg-transparent font-mono font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer">
+                  <option value="all">Semua Disk (All Disks)</option>
+                </select>
+              </div>
+
+              <button onclick="triggerStorageScan()" id="btn-storage-scan" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-all active:scale-95">
+                <i data-lucide="play" class="w-3.5 h-3.5" id="storage-scan-icon"></i>
+                <span id="txt-btn-storage-scan">Mulai Pindai Disk</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Capacity Bar (Microsoft PC Manager Style) -->
+          <div class="space-y-2 pt-1">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <div class="flex items-center gap-2">
+                <span id="storage-active-label" class="font-bold text-zinc-800 dark:text-zinc-200">Semua Disk</span>
+                <span class="text-zinc-400">•</span>
+                <span id="storage-free-summary" class="text-emerald-600 dark:text-emerald-400 font-semibold">Tersedia -- GB</span>
+              </div>
+              <span id="storage-used-summary" class="text-zinc-500 tabular-nums">Terpakai -- / -- GB (--%)</span>
+            </div>
+
+            <!-- Segmented Multi-Color Bar -->
+            <div id="storage-segmented-bar" class="w-full h-3 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden flex shadow-inner">
+              <div id="seg-user" class="h-full bg-rose-500 transition-all duration-300" style="width: 0%" title="User Files"></div>
+              <div id="seg-app" class="h-full bg-amber-500 transition-all duration-300" style="width: 0%" title="Application Files"></div>
+              <div id="seg-system" class="h-full bg-blue-500 transition-all duration-300" style="width: 0%" title="System Files"></div>
+              <div id="seg-recycle" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%" title="Recycle Bin"></div>
+              <div id="seg-other" class="h-full bg-zinc-500 transition-all duration-300" style="width: 0%" title="Other / Caches"></div>
+            </div>
+
+            <!-- Segmented Bar Legend -->
+            <div class="flex items-center justify-between gap-2 text-[11px] font-mono text-zinc-500 dark:text-zinc-400 flex-wrap pt-0.5">
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span><span id="lbl-seg-user">Berkas Pengguna</span> <span id="val-seg-user" class="tabular-nums font-bold text-zinc-700 dark:text-zinc-300">(--)</span></div>
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span><span id="lbl-seg-app">Aplikasi</span> <span id="val-seg-app" class="tabular-nums font-bold text-zinc-700 dark:text-zinc-300">(--)</span></div>
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span><span id="lbl-seg-system">Sistem Windows</span> <span id="val-seg-system" class="tabular-nums font-bold text-zinc-700 dark:text-zinc-300">(--)</span></div>
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span><span id="lbl-seg-recycle">Tempat Sampah</span> <span id="val-seg-recycle" class="tabular-nums font-bold text-zinc-700 dark:text-zinc-300">(--)</span></div>
+              <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-zinc-500"></span><span id="lbl-seg-other">Lainnya / Cache</span> <span id="val-seg-other" class="tabular-nums font-bold text-zinc-700 dark:text-zinc-300">(--)</span></div>
+            </div>
+          </div>
+
+          <!-- Real-Time Progress Bar Card (Visible when scanning) -->
+          <div id="storage-progress-card" class="hidden rounded-lg p-3 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/60 space-y-2 mt-2">
+            <div class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                <span id="storage-progress-status" class="font-semibold text-zinc-800 dark:text-zinc-200">Memindai berkas...</span>
+              </div>
+              <div class="flex items-center gap-2 font-mono text-xs">
+                <span id="storage-progress-stats" class="text-zinc-500 tabular-nums">0 berkas (0 MB)</span>
+                <span id="storage-progress-pct" class="font-bold text-blue-600 dark:text-blue-400 tabular-nums">0%</span>
+                <button onclick="cancelStorageScan()" class="px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 hover:bg-rose-600 hover:text-white text-[11px] font-sans font-medium transition-all" id="btn-storage-cancel">Batal</button>
+              </div>
+            </div>
+            <div class="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+              <div id="storage-progress-fill" class="h-full bg-blue-600 transition-all duration-150 rounded-full" style="width: 0%"></div>
+            </div>
+            <p id="storage-progress-path" class="text-[10px] font-mono text-zinc-400 truncate">--</p>
+          </div>
+        </div>
+
+        <!-- 2. STORAGE SUB-NAV TABS (Smart Cleanup, Large Items, Old Items, Duplicates) -->
+        <div class="flex items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2 flex-wrap">
+          <div class="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-850 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-semibold">
+            <button id="btn-sub-recommend" onclick="setStorageSubTab('recommend')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs transition-all">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+              <span id="txt-sub-recommend">Rekomendasi Pembersihan</span>
+              <span id="badge-recommend-count" class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono font-bold tabular-nums">0</span>
+            </button>
+
+            <button id="btn-sub-large" onclick="setStorageSubTab('large')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all">
+              <i data-lucide="file-stack" class="w-3.5 h-3.5 text-blue-500"></i>
+              <span id="txt-sub-large">Berkas & Folder Besar</span>
+              <span id="badge-large-count" class="px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-mono font-bold tabular-nums">0</span>
+            </button>
+
+            <button id="btn-sub-old" onclick="setStorageSubTab('old')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all">
+              <i data-lucide="clock" class="w-3.5 h-3.5 text-purple-500"></i>
+              <span id="txt-sub-old">Berkas / Aplikasi Lawas</span>
+              <span id="badge-old-count" class="px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-mono font-bold tabular-nums">0</span>
+            </button>
+
+            <button id="btn-sub-dup" onclick="setStorageSubTab('dup')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all">
+              <i data-lucide="copy" class="w-3.5 h-3.5 text-rose-500"></i>
+              <span id="txt-sub-dup">Berkas Duplikat</span>
+              <span id="badge-dup-count" class="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/10 text-rose-600 dark:text-rose-400 font-mono font-bold tabular-nums">0</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 1: SMART CLEANUP RECOMMENDATIONS -->
+        <div id="subview-recommend" class="space-y-3">
+          <div class="app-surface p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-emerald-500/5 to-transparent border-emerald-500/20">
+            <div class="flex items-center gap-2.5">
+              <div class="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg shrink-0">
+                <i data-lucide="shield-check" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100" id="txt-rec-banner-title">Pembersihan Aman Rekomendasi Gemi</h4>
+                <p class="text-[11px] text-zinc-500 dark:text-zinc-400" id="txt-rec-banner-sub">Hapus cache installer, crash dump, dan file temporary tanpa mengganggu data pribadi maupun aplikasi.</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3 shrink-0">
+              <div class="text-right">
+                <span class="text-[10px] font-mono text-zinc-400 uppercase block" id="lbl-rec-cleanable">POTENSI HEMAT</span>
+                <span id="rec-total-cleanable" class="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">0 B</span>
+              </div>
+              <button onclick="cleanRecommendedItems()" id="btn-clean-recommended" class="flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all active:scale-95">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span id="txt-btn-clean-rec">Bersihkan Terpilih</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Recommendations Checklist Container -->
+          <div id="recommendations-container" class="space-y-2">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- SUB-TAB 2: LARGE FILES & FOLDERS -->
+        <div id="subview-large" class="hidden space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+            <div class="flex items-center gap-2 flex-wrap">
+              <!-- Size Filter -->
+              <div class="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700">
+                <span class="text-zinc-500" id="lbl-large-filter">Ukuran:</span>
+                <select id="filter-large-size" onchange="renderLargeItems()" class="bg-transparent font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer focus:outline-none">
+                  <option value="all">Semua Ukuran</option>
+                  <option value="1000">&gt; 1 GB</option>
+                  <option value="500">&gt; 500 MB</option>
+                  <option value="100" selected>&gt; 100 MB</option>
+                </select>
+              </div>
+
+              <!-- Type Filter -->
+              <div class="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700">
+                <span class="text-zinc-500" id="lbl-large-type">Tipe:</span>
+                <select id="filter-large-type" onchange="renderLargeItems()" class="bg-transparent font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer focus:outline-none">
+                  <option value="all">Folder &amp; Berkas</option>
+                  <option value="file">Hanya Berkas</option>
+                  <option value="dir">Hanya Folder</option>
+                </select>
+              </div>
+
+              <!-- Sort Order -->
+              <div class="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700">
+                <span class="text-zinc-500" id="lbl-large-sort">Urutan:</span>
+                <select id="sort-large-order" onchange="renderLargeItems()" class="bg-transparent font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer focus:outline-none">
+                  <option value="desc" selected>Terbesar &rarr; Terkecil</option>
+                  <option value="asc">Terkecil &rarr; Terbesar</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Search input -->
+            <div class="relative w-full sm:w-64">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2.5"></i>
+              <input type="text" id="search-large-input" oninput="renderLargeItems()" placeholder="Cari nama berkas/folder..." class="w-full pl-8 pr-3 py-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs focus:outline-none focus:border-blue-500 text-zinc-800 dark:text-zinc-200">
+            </div>
+          </div>
+
+          <!-- Large Items Table -->
+          <div class="app-surface overflow-hidden">
+            <div class="overflow-x-auto max-h-[500px]">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-zinc-100 dark:bg-zinc-850 border-b border-zinc-200 dark:border-zinc-700/60 sticky top-0 z-10 text-[11px] font-mono text-zinc-500">
+                  <tr>
+                    <th class="py-2 px-3 font-semibold" id="th-name">NAMA ITEM</th>
+                    <th class="py-2 px-3 font-semibold w-24 text-right" id="th-size">UKURAN</th>
+                    <th class="py-2 px-3 font-semibold w-36" id="th-mtime">TERAKHIR DIUBAH</th>
+                    <th class="py-2 px-3 font-semibold w-28 text-center" id="th-action">AKSI</th>
+                  </tr>
+                </thead>
+                <tbody id="table-large-items" class="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono text-[11px]">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 3: OLD & UNUSED ITEMS -->
+        <div id="subview-old" class="hidden space-y-3">
+          <div class="flex items-center justify-between gap-2.5 text-xs flex-wrap">
+            <div class="flex items-center gap-2">
+              <span class="text-zinc-500" id="lbl-old-filter">Batas Ketidakaktifan:</span>
+              <div class="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-700">
+                <button onclick="filterOldByDays(30)" id="btn-old-30" class="px-2.5 py-1 rounded text-xs font-semibold transition-all text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">&gt; 1 Bulan</button>
+                <button onclick="filterOldByDays(90)" id="btn-old-90" class="px-2.5 py-1 rounded text-xs font-semibold transition-all bg-white dark:bg-zinc-900 text-purple-600 dark:text-purple-400 shadow-xs">&gt; 3 Bulan</button>
+                <button onclick="filterOldByDays(180)" id="btn-old-180" class="px-2.5 py-1 rounded text-xs font-semibold transition-all text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">&gt; 6 Bulan</button>
+                <button onclick="filterOldByDays(365)" id="btn-old-365" class="px-2.5 py-1 rounded text-xs font-semibold transition-all text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">&gt; 1 Tahun</button>
+              </div>
+            </div>
+
+            <span id="old-items-summary" class="text-zinc-400 font-mono text-[11px]">Menampilkan berkas jarang dibuka</span>
+          </div>
+
+          <!-- Old Items Table -->
+          <div class="app-surface overflow-hidden">
+            <div class="overflow-x-auto max-h-[500px]">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-zinc-100 dark:bg-zinc-850 border-b border-zinc-200 dark:border-zinc-700/60 sticky top-0 z-10 text-[11px] font-mono text-zinc-500">
+                  <tr>
+                    <th class="py-2 px-3 font-semibold" id="th-old-name">NAMA BERKAS / APLIKASI</th>
+                    <th class="py-2 px-3 font-semibold w-24 text-right" id="th-old-size">UKURAN</th>
+                    <th class="py-2 px-3 font-semibold w-28 text-center" id="th-old-age">USIA</th>
+                    <th class="py-2 px-3 font-semibold w-36" id="th-old-mtime">TERAKHIR DIAKSES</th>
+                    <th class="py-2 px-3 font-semibold w-28 text-center" id="th-old-action">AKSI</th>
+                  </tr>
+                </thead>
+                <tbody id="table-old-items" class="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono text-[11px]">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 4: DUPLICATE FILES FINDER -->
+        <div id="subview-dup" class="hidden space-y-3">
+          <div class="app-surface p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-50 dark:bg-zinc-850">
+            <div>
+              <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100" id="txt-dup-banner-title">Manajemen Berkas Duplikat Identik</h4>
+              <p class="text-[11px] text-zinc-500 dark:text-zinc-400" id="txt-dup-banner-sub">Pilih salinan yang ingin dihapus untuk membebaskan ruang tanpa kehilangan berkas asli.</p>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="autoSelectDuplicates('newest')" class="px-2.5 py-1 rounded bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-xs font-semibold transition-all" id="btn-dup-keep-newest">
+                Pertahankan Terbaru
+              </button>
+              <button onclick="autoSelectDuplicates('oldest')" class="px-2.5 py-1 rounded bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-xs font-semibold transition-all" id="btn-dup-keep-oldest">
+                Pertahankan Tertua
+              </button>
+              <button onclick="deleteSelectedDuplicates()" id="btn-delete-dup" class="flex items-center gap-1.5 px-3 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-all active:scale-95">
+                <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                <span id="txt-btn-delete-dup">Hapus Salinan Terpilih</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Duplicates Groups Container -->
+          <div id="duplicates-container" class="space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+      </div>
+
 
     </div>
   </main>

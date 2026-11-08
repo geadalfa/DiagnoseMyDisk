@@ -31,6 +31,9 @@ const I18N = {
     modeLayman: 'Ringkasan',
     modeTech: 'Forensik S.M.A.R.T',
     modeScanner: 'Pindai Sektor & Pemulihan',
+    modeStorage: 'Penyimpanan & Bersih',
+    storageTitle: 'Manajemen & Analisis Penyimpanan Disk',
+    storageSubtitle: 'Pindai seluruh disk, temukan berkas duplikat, filter berkas besar/lawas, dan bersihkan cache sistem',
     refresh: 'Pindai Ulang',
     themeLight: 'Terang',
     themeDark: 'Gelap',
@@ -132,6 +135,9 @@ const I18N = {
     modeLayman: 'Summary',
     modeTech: 'S.M.A.R.T Forensic',
     modeScanner: 'Bad Sector & Repair',
+    modeStorage: 'Storage & Cleanup',
+    storageTitle: 'Disk Storage Management & Analysis',
+    storageSubtitle: 'Scan all drives, detect duplicate files, filter large/old files, and clean up system bloat',
     refresh: 'Rescan',
     themeLight: 'Light',
     themeDark: 'Dark',
@@ -296,6 +302,12 @@ function setLanguage(lang, triggerRender = true) {
   document.getElementById('txt-mode-layman').textContent = t.modeLayman;
   document.getElementById('txt-mode-tech').textContent = t.modeTech;
   document.getElementById('txt-mode-scanner').textContent = t.modeScanner;
+  const txtModeStorage = document.getElementById('txt-mode-storage');
+  if (txtModeStorage) txtModeStorage.textContent = t.modeStorage || 'Penyimpanan & Bersih';
+  const txtStorageTitle = document.getElementById('txt-storage-title');
+  if (txtStorageTitle && t.storageTitle) txtStorageTitle.textContent = t.storageTitle;
+  const txtStorageSubtitle = document.getElementById('txt-storage-subtitle');
+  if (txtStorageSubtitle && t.storageSubtitle) txtStorageSubtitle.textContent = t.storageSubtitle;
   document.getElementById('txt-refresh').textContent = t.refresh;
   document.getElementById('txt-masking-title').textContent = t.maskingTitle;
   document.getElementById('txt-masking-badge').textContent = t.maskingBadge;
@@ -414,20 +426,28 @@ function setMode(mode) {
   const btnLayman = document.getElementById('btn-mode-layman');
   const btnTech = document.getElementById('btn-mode-tech');
   const btnScanner = document.getElementById('btn-mode-scanner');
+  const btnStorage = document.getElementById('btn-mode-storage');
   const viewLayman = document.getElementById('view-layman');
   const viewTech = document.getElementById('view-tech');
   const viewScanner = document.getElementById('view-scanner');
+  const viewStorage = document.getElementById('view-storage');
 
   const activeClass = 'flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-all bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs';
   const inactiveClass = 'flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-all text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100';
 
-  btnLayman.className = mode === 'layman' ? activeClass : inactiveClass;
-  btnTech.className = mode === 'tech' ? activeClass : inactiveClass;
-  btnScanner.className = mode === 'scanner' ? activeClass : inactiveClass;
+  if (btnLayman) btnLayman.className = mode === 'layman' ? activeClass : inactiveClass;
+  if (btnTech) btnTech.className = mode === 'tech' ? activeClass : inactiveClass;
+  if (btnScanner) btnScanner.className = mode === 'scanner' ? activeClass : inactiveClass;
+  if (btnStorage) btnStorage.className = mode === 'storage' ? activeClass : inactiveClass;
 
-  viewLayman.classList.toggle('hidden', mode !== 'layman');
-  viewTech.classList.toggle('hidden', mode !== 'tech');
-  viewScanner.classList.toggle('hidden', mode !== 'scanner');
+  if (viewLayman) viewLayman.classList.toggle('hidden', mode !== 'layman');
+  if (viewTech) viewTech.classList.toggle('hidden', mode !== 'tech');
+  if (viewScanner) viewScanner.classList.toggle('hidden', mode !== 'scanner');
+  if (viewStorage) viewStorage.classList.toggle('hidden', mode !== 'storage');
+
+  if (mode === 'storage') {
+    initStorageView();
+  }
 
   safeCreateIcons();
 }
@@ -1322,3 +1342,899 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+
+
+// ==============================================================================
+// STORAGE MANAGEMENT & SMART CLEANUP CONTROLLER (v2.0.0)
+// ==============================================================================
+
+let storageDrives = [];
+let selectedStorageDrive = 'all';
+let currentStorageSubTab = 'recommend';
+let storageScanPollTimer = null;
+let storageResults = null;
+let storageIsScanning = false;
+
+// Filter states for Large Items
+let storageLargeFilterMinBytes = 100 * 1024 * 1024; // Default 100MB
+let storageLargeFilterType = 'all'; // 'all', 'file', 'dir'
+let storageLargeSortOrder = 'desc'; // 'desc', 'asc'
+let storageLargeSearchQuery = '';
+
+// Filter states for Old Items
+let storageOldFilterDays = 90; // Default > 90 days
+
+// Selected checkboxes
+let selectedRecommendationIndices = new Set();
+let selectedDuplicatePaths = new Set();
+
+// Utility format bytes for frontend display
+function formatStorageBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  if (!bytes || isNaN(bytes)) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Format relative date or days
+function formatAgeDays(days) {
+  if (days < 30) return `${days} hari`;
+  if (days < 365) return `~${Math.floor(days / 30)} bulan (${days} hr)`;
+  const years = (days / 365).toFixed(1);
+  return `~${years} thn (${days} hr)`;
+}
+
+// 1. Initialize Storage View
+async function initStorageView() {
+  await loadStorageDrives();
+  await checkStorageScanStatus();
+}
+
+// 2. Load available drives
+async function loadStorageDrives() {
+  try {
+    const res = await fetch('/api/storage/drives');
+    const data = await res.json();
+    if (data.success && data.drives) {
+      storageDrives = data.drives;
+      renderStorageDriveDropdown();
+      updateDriveUsageHero();
+    }
+  } catch (err) {
+    console.error('Failed to load storage drives:', err);
+  }
+}
+
+// Render drive selector dropdown
+function renderStorageDriveDropdown() {
+  const select = document.getElementById('storage-drive-select');
+  if (!select) return;
+
+  const currentVal = select.value || 'all';
+  select.innerHTML = '<option value="all">Semua Disk (All Disks)</option>';
+
+  storageDrives.forEach((drv) => {
+    const opt = document.createElement('option');
+    opt.value = drv.drive;
+    const freeStr = formatStorageBytes(drv.free);
+    const totalStr = formatStorageBytes(drv.total);
+    opt.textContent = `${drv.drive} (${freeStr} bebas / ${totalStr})`;
+    select.appendChild(opt);
+  });
+
+  select.value = currentVal;
+  select.onchange = (e) => {
+    selectedStorageDrive = e.target.value;
+    updateDriveUsageHero();
+    if (storageResults) {
+      renderStorageResults(storageResults);
+    }
+  };
+}
+
+// Update PC Manager segmented bar and numbers
+function updateDriveUsageHero() {
+  const labelElem = document.getElementById('storage-active-label');
+  const freeSummary = document.getElementById('storage-free-summary');
+  const usedSummary = document.getElementById('storage-used-summary');
+
+  let totalBytes = 0;
+  let usedBytes = 0;
+  let freeBytes = 0;
+
+  if (selectedStorageDrive === 'all') {
+    if (labelElem) labelElem.textContent = 'Semua Disk Tergabung';
+    storageDrives.forEach((d) => {
+      totalBytes += d.total || 0;
+      usedBytes += d.used || 0;
+      freeBytes += d.free || 0;
+    });
+  } else {
+    const d = storageDrives.find((drv) => drv.drive.toUpperCase() === selectedStorageDrive.toUpperCase());
+    if (d) {
+      if (labelElem) labelElem.textContent = `Drive ${d.drive} (${d.fstype || 'NTFS'})`;
+      totalBytes = d.total || 0;
+      usedBytes = d.used || 0;
+      freeBytes = d.free || 0;
+    }
+  }
+
+  const percentUsed = totalBytes > 0 ? ((usedBytes / totalBytes) * 100).toFixed(1) : 0;
+  if (freeSummary) freeSummary.textContent = `Tersedia ${formatStorageBytes(freeBytes)}`;
+  if (usedSummary) usedSummary.textContent = `Terpakai ${formatStorageBytes(usedBytes)} / ${formatStorageBytes(totalBytes)} (${percentUsed}%)`;
+
+  // Segmented bar breakdown
+  if (storageResults && storageResults.breakdown) {
+    const b = storageResults.breakdown;
+    const total = totalBytes > 0 ? totalBytes : (b.total_used || 1);
+
+    const pUser = Math.min(100, (b.user_files / total) * 100);
+    const pApp = Math.min(100, (b.app_files / total) * 100);
+    const pSys = Math.min(100, (b.system_files / total) * 100);
+    const pRecycle = Math.min(100, (b.recycle_bin / total) * 100);
+    const pOther = Math.max(0, 100 - (pUser + pApp + pSys + pRecycle));
+
+    setSegmentWidth('seg-user', pUser);
+    setSegmentWidth('seg-app', pApp);
+    setSegmentWidth('seg-system', pSys);
+    setSegmentWidth('seg-recycle', pRecycle);
+    setSegmentWidth('seg-other', pOther);
+
+    setElementText('val-seg-user', formatStorageBytes(b.user_files));
+    setElementText('val-seg-app', formatStorageBytes(b.app_files));
+    setElementText('val-seg-system', formatStorageBytes(b.system_files));
+    setElementText('val-seg-recycle', formatStorageBytes(b.recycle_bin));
+    setElementText('val-seg-other', formatStorageBytes(b.other));
+  } else {
+    // Proportional visual representation based on used space
+    const pUsed = parseFloat(percentUsed) || 0;
+    setSegmentWidth('seg-user', pUsed * 0.45);
+    setSegmentWidth('seg-app', pUsed * 0.30);
+    setSegmentWidth('seg-system', pUsed * 0.15);
+    setSegmentWidth('seg-recycle', pUsed * 0.02);
+    setSegmentWidth('seg-other', pUsed * 0.08);
+
+    setElementText('val-seg-user', formatStorageBytes(usedBytes * 0.45));
+    setElementText('val-seg-app', formatStorageBytes(usedBytes * 0.30));
+    setElementText('val-seg-system', formatStorageBytes(usedBytes * 0.15));
+    setElementText('val-seg-recycle', formatStorageBytes(usedBytes * 0.02));
+    setElementText('val-seg-other', formatStorageBytes(usedBytes * 0.08));
+  }
+}
+
+function setSegmentWidth(id, pct) {
+  const elem = document.getElementById(id);
+  if (elem) elem.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+}
+
+function setElementText(id, text) {
+  const elem = document.getElementById(id);
+  if (elem) elem.textContent = text;
+}
+
+// 3. Check scan status on page load or tab switch
+async function checkStorageScanStatus() {
+  try {
+    const res = await fetch('/api/storage/scan_status');
+    const status = await res.json();
+    if (status.is_scanning) {
+      showStorageProgress(true);
+      startStoragePolling();
+    } else if (status.has_results) {
+      loadStorageResults();
+    }
+  } catch (err) {
+    console.error('Error checking storage status:', err);
+  }
+}
+
+// 4. Trigger Scan
+async function triggerStorageScan() {
+  const select = document.getElementById('storage-drive-select');
+  const drive = select ? select.value : 'all';
+
+  const btnScan = document.getElementById('btn-storage-scan');
+  const txtScan = document.getElementById('txt-btn-storage-scan');
+  if (btnScan) btnScan.disabled = true;
+  if (txtScan) txtScan.textContent = 'Menyiapkan Pindai...';
+
+  try {
+    const res = await fetch('/api/storage/start_scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ drive })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showStorageProgress(true);
+      startStoragePolling();
+    } else {
+      alert(`Gagal memulai pemindaian: ${data.message || data.error}`);
+    }
+  } catch (err) {
+    alert(`Terjadi kesalahan jaringan: ${err.message}`);
+  } finally {
+    if (btnScan) btnScan.disabled = false;
+  }
+}
+
+// 5. Cancel Scan
+async function cancelStorageScan() {
+  try {
+    const btnCancel = document.getElementById('btn-storage-cancel');
+    if (btnCancel) btnCancel.disabled = true;
+    await fetch('/api/storage/cancel_scan', { method: 'POST' });
+    const statusElem = document.getElementById('storage-progress-status');
+    if (statusElem) statusElem.textContent = 'Membatalkan pemindaian...';
+  } catch (err) {
+    console.error('Failed to cancel scan:', err);
+  }
+}
+
+// 6. Polling Scan Progress
+function startStoragePolling() {
+  if (storageScanPollTimer) clearInterval(storageScanPollTimer);
+  storageIsScanning = true;
+
+  const btnScan = document.getElementById('btn-storage-scan');
+  const txtScan = document.getElementById('txt-btn-storage-scan');
+  const iconScan = document.getElementById('storage-scan-icon');
+  if (btnScan) {
+    btnScan.classList.replace('bg-blue-600', 'bg-zinc-600');
+    btnScan.classList.replace('hover:bg-blue-700', 'hover:bg-zinc-700');
+  }
+  if (txtScan) txtScan.textContent = 'Memindai...';
+  if (iconScan) iconScan.setAttribute('data-lucide', 'loader-2');
+  safeCreateIcons();
+
+  storageScanPollTimer = setInterval(async () => {
+    try {
+      const res = await fetch('/api/storage/scan_status');
+      const st = await res.json();
+
+      updateStorageProgressBar(st);
+
+      if (!st.is_scanning) {
+        clearInterval(storageScanPollTimer);
+        storageScanPollTimer = null;
+        storageIsScanning = false;
+
+        if (btnScan) {
+          btnScan.classList.replace('bg-zinc-600', 'bg-blue-600');
+          btnScan.classList.replace('hover:bg-zinc-700', 'hover:bg-blue-700');
+        }
+        if (txtScan) txtScan.textContent = 'Mulai Pindai Disk';
+        if (iconScan) iconScan.setAttribute('data-lucide', 'play');
+        safeCreateIcons();
+
+        setTimeout(() => {
+          showStorageProgress(false);
+          loadStorageResults();
+        }, 600);
+      }
+    } catch (err) {
+      console.error('Error polling storage scan:', err);
+    }
+  }, 400);
+}
+
+function updateStorageProgressBar(st) {
+  const pBar = document.getElementById('storage-progress-fill');
+  const pPct = document.getElementById('storage-progress-percentage');
+  const pStatus = document.getElementById('storage-progress-status');
+  const pPath = document.getElementById('storage-progress-path');
+  const pCount = document.getElementById('storage-progress-count');
+
+  const pct = Math.max(0, Math.min(100, st.progress || 0));
+  if (pBar) pBar.style.width = `${pct}%`;
+  if (pPct) pPct.textContent = `${pct}%`;
+  if (pStatus) pStatus.textContent = st.status_text || 'Sedang memindai berkas...';
+  if (pPath) pPath.textContent = st.current_path || '-';
+  if (pCount) {
+    const filesStr = (st.files_scanned || 0).toLocaleString();
+    const bytesStr = formatStorageBytes(st.bytes_scanned || 0);
+    pCount.textContent = `${filesStr} berkas (${bytesStr}) terindeks`;
+  }
+}
+
+function showStorageProgress(show) {
+  const card = document.getElementById('storage-progress-card');
+  if (card) {
+    card.classList.toggle('hidden', !show);
+  }
+}
+
+// 7. Load and Render Results
+async function loadStorageResults() {
+  try {
+    const res = await fetch('/api/storage/results');
+    const data = await res.json();
+    if (data.status === 'ok') {
+      storageResults = data;
+      renderStorageResults(data);
+      updateDriveUsageHero();
+    }
+  } catch (err) {
+    console.error('Failed to load storage results:', err);
+  }
+}
+
+function renderStorageResults(data) {
+  // Update badge counts
+  const countRec = data.recommendations ? data.recommendations.length : 0;
+  const countLarge = data.large_items ? data.large_items.length : 0;
+  const countOld = data.old_items ? data.old_items.length : 0;
+  const countDup = data.duplicate_groups ? data.duplicate_groups.length : 0;
+
+  setElementText('badge-count-recommend', countRec);
+  setElementText('badge-count-large', countLarge);
+  setElementText('badge-count-old', countOld);
+  setElementText('badge-count-dup', countDup);
+
+  // Render tabs
+  renderRecommendationsSubTab();
+  renderLargeItemsSubTab();
+  renderOldItemsSubTab();
+  renderDuplicatesSubTab();
+}
+
+// Sub-Tab Switcher
+function setStorageSubTab(tab) {
+  currentStorageSubTab = tab;
+  const tabs = ['recommend', 'large', 'old', 'dup'];
+
+  tabs.forEach((t) => {
+    const btn = document.getElementById(`btn-subtab-${t}`);
+    const view = document.getElementById(`subview-${t}`);
+
+    const isActive = t === tab;
+    if (btn) {
+      if (isActive) {
+        btn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-xs bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs border border-zinc-200 dark:border-zinc-700/80 transition-all';
+      } else {
+        btn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md font-semibold text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all';
+      }
+    }
+    if (view) {
+      view.classList.toggle('hidden', !isActive);
+    }
+  });
+
+  safeCreateIcons();
+}
+
+// Subview 1: Recommendations
+function renderRecommendationsSubTab() {
+  const container = document.getElementById('recommendations-container');
+  if (!container) return;
+
+  const items = (storageResults && storageResults.recommendations) || [];
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="app-surface p-8 text-center space-y-2">
+        <i data-lucide="check-circle-2" class="w-8 h-8 text-emerald-500 mx-auto"></i>
+        <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">Sistem Bersih dan Rapi</h4>
+        <p class="text-xs text-zinc-500">Tidak ada penumpukan cache atau berkas sampah yang mendesak untuk dibersihkan.</p>
+      </div>`;
+    safeCreateIcons();
+    updateRecommendationSummary();
+    return;
+  }
+
+  // Pre-select all safe recommendations by default
+  selectedRecommendationIndices.clear();
+  items.forEach((item, idx) => {
+    if (item.safe_to_delete) selectedRecommendationIndices.add(idx);
+  });
+
+  let html = '';
+  items.forEach((item, idx) => {
+    const isChecked = selectedRecommendationIndices.has(idx);
+    const sizeStr = formatStorageBytes(item.size);
+
+    html += `
+      <div class="storage-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isChecked ? 'ring-1 ring-emerald-500/30 bg-emerald-500/5' : ''}" id="rec-card-${idx}">
+        <div class="flex items-start gap-3">
+          <input type="checkbox" id="chk-rec-${idx}" onchange="toggleRecommendation(${idx})" class="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-600 cursor-pointer" ${isChecked ? 'checked' : ''}>
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">${escapeHtml(item.category)}</span>
+              <span class="badge-tag bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Aman Dihapus</span>
+            </div>
+            <p class="text-[11px] text-zinc-500 dark:text-zinc-400">${escapeHtml(item.description)}</p>
+            <div class="text-[10px] font-mono text-zinc-400 truncate max-w-md">${escapeHtml(item.path)}</div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-200 dark:border-zinc-800">
+          <div class="text-right">
+            <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">${sizeStr}</div>
+            <div class="text-[10px] text-zinc-400">Potensi Hemat</div>
+          </div>
+          <button onclick="openInExplorer('${escapePath(item.path)}')" class="btn-icon-action px-2.5 py-1.5 rounded text-xs flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300" title="Buka di File Explorer">
+            <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
+            <span>Buka</span>
+          </button>
+        </div>
+      </div>`;
+  });
+
+  container.innerHTML = html;
+  safeCreateIcons();
+  updateRecommendationSummary();
+}
+
+function toggleRecommendation(idx) {
+  if (selectedRecommendationIndices.has(idx)) {
+    selectedRecommendationIndices.delete(idx);
+  } else {
+    selectedRecommendationIndices.add(idx);
+  }
+  const card = document.getElementById(`rec-card-${idx}`);
+  if (card) {
+    card.classList.toggle('ring-1', selectedRecommendationIndices.has(idx));
+    card.classList.toggle('ring-emerald-500/30', selectedRecommendationIndices.has(idx));
+    card.classList.toggle('bg-emerald-500/5', selectedRecommendationIndices.has(idx));
+  }
+  updateRecommendationSummary();
+}
+
+function updateRecommendationSummary() {
+  const items = (storageResults && storageResults.recommendations) || [];
+  let totalReclaimable = 0;
+  selectedRecommendationIndices.forEach((idx) => {
+    if (items[idx]) totalReclaimable += items[idx].size || 0;
+  });
+
+  const summaryElem = document.getElementById('txt-recommendations-summary');
+  const btnClean = document.getElementById('btn-clean-recommendations');
+  const count = selectedRecommendationIndices.size;
+
+  if (summaryElem) {
+    summaryElem.textContent = `${count} dari ${items.length} item terpilih · Total potensi ruang bebas: ${formatStorageBytes(totalReclaimable)}`;
+  }
+  if (btnClean) {
+    btnClean.disabled = count === 0;
+    btnClean.innerHTML = `<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Bersihkan ${formatStorageBytes(totalReclaimable)}`;
+    safeCreateIcons();
+  }
+}
+
+async function cleanRecommendedItems() {
+  const items = (storageResults && storageResults.recommendations) || [];
+  const pathsToClean = [];
+  selectedRecommendationIndices.forEach((idx) => {
+    if (items[idx] && items[idx].path) pathsToClean.push(items[idx].path);
+  });
+
+  if (pathsToClean.length === 0) return;
+
+  const confirmMsg = `Yakin ingin membersihkan ${pathsToClean.length} direktori/cache terpilih?\n\nItem yang dibersihkan adalah berkas temporer, cache compiler/package, atau crash dumps yang aman dihapus.`;
+  if (!confirm(confirmMsg)) return;
+
+  const btnClean = document.getElementById('btn-clean-recommendations');
+  if (btnClean) btnClean.disabled = true;
+
+  try {
+    const res = await fetch('/api/storage/clean', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths: pathsToClean })
+    });
+    const result = await res.json();
+    if (result.success) {
+      alert(`Pembersihan Selesai!\n\nRuang berhasil dibebaskan: ${result.reclaimed_formatted}\nItem terhapus: ${result.deleted_count}`);
+      await loadStorageDrives();
+      await triggerStorageScan();
+    } else {
+      alert(`Pembersihan selesai dengan catatan: ${result.errors && result.errors.length ? result.errors[0] : 'Beberapa berkas mungkin sedang dikunci oleh proses lain.'}`);
+      await loadStorageDrives();
+      await triggerStorageScan();
+    }
+  } catch (err) {
+    alert(`Terjadi kesalahan: ${err.message}`);
+  } finally {
+    if (btnClean) btnClean.disabled = false;
+  }
+}
+
+// Subview 2: Large Items
+function filterLargeBySize(minMB) {
+  storageLargeFilterMinBytes = minMB * 1024 * 1024;
+  ['100', '500', '1024'].forEach((val) => {
+    const btn = document.getElementById(`btn-size-${val === '1024' ? '1gb' : val + 'mb'}`);
+    if (btn) {
+      const isActive = (val === '1024' && minMB >= 1024) || (val === String(minMB));
+      if (isActive) {
+        btn.className = 'px-2 py-0.5 rounded text-xs font-semibold bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs transition-all';
+      } else {
+        btn.className = 'px-2 py-0.5 rounded text-xs font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all';
+      }
+    }
+  });
+  renderLargeItemsSubTab();
+}
+
+function onLargeSearchInput() {
+  const inp = document.getElementById('large-search-input');
+  storageLargeSearchQuery = (inp ? inp.value : '').toLowerCase().trim();
+  renderLargeItemsSubTab();
+}
+
+function onLargeTypeChange() {
+  const sel = document.getElementById('large-type-select');
+  storageLargeFilterType = sel ? sel.value : 'all';
+  renderLargeItemsSubTab();
+}
+
+function onLargeSortChange() {
+  const sel = document.getElementById('large-sort-select');
+  storageLargeSortOrder = sel ? sel.value : 'desc';
+  renderLargeItemsSubTab();
+}
+
+function renderLargeItemsSubTab() {
+  const tbody = document.getElementById('table-large-items');
+  const summaryElem = document.getElementById('large-items-summary');
+  if (!tbody) return;
+
+  let items = (storageResults && storageResults.large_items) || [];
+
+  // Filter by size
+  items = items.filter((item) => (item.size || 0) >= storageLargeFilterMinBytes);
+
+  // Filter by type
+  if (storageLargeFilterType === 'file') {
+    items = items.filter((item) => !item.is_dir);
+  } else if (storageLargeFilterType === 'dir') {
+    items = items.filter((item) => item.is_dir);
+  }
+
+  // Filter by search query
+  if (storageLargeSearchQuery) {
+    items = items.filter((item) =>
+      (item.name || '').toLowerCase().includes(storageLargeSearchQuery) ||
+      (item.path || '').toLowerCase().includes(storageLargeSearchQuery)
+    );
+  }
+
+  // Sort
+  items.sort((a, b) => {
+    if (storageLargeSortOrder === 'asc') return (a.size || 0) - (b.size || 0);
+    return (b.size || 0) - (a.size || 0);
+  });
+
+  if (summaryElem) {
+    let totalBytes = items.reduce((acc, cur) => acc + (cur.size || 0), 0);
+    summaryElem.textContent = `Menampilkan ${items.length} item · Total: ${formatStorageBytes(totalBytes)}`;
+  }
+
+  if (items.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="py-8 text-center text-zinc-500 text-xs">
+          Tidak ada berkas/folder yang cocok dengan kriteria filter saat ini.
+        </td>
+      </tr>`;
+    return;
+  }
+
+  let html = '';
+  items.slice(0, 150).forEach((item) => {
+    const isFolder = item.is_dir;
+    const typeBadge = isFolder
+      ? `<span class="badge-tag bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">Folder</span>`
+      : `<span class="badge-tag bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Berkas</span>`;
+
+    html += `
+      <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+        <td class="py-2 px-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="${isFolder ? 'folder' : 'file'}" class="w-3.5 h-3.5 text-zinc-400 shrink-0"></i>
+            <div class="truncate max-w-sm font-semibold text-zinc-900 dark:text-zinc-100" title="${escapeHtml(item.path)}">
+              ${escapeHtml(item.name)}
+            </div>
+          </div>
+          <div class="text-[10px] text-zinc-400 truncate max-w-sm pl-5 font-mono">${escapeHtml(item.path)}</div>
+        </td>
+        <td class="py-2 px-3 text-center">${typeBadge}</td>
+        <td class="py-2 px-3 text-right font-bold text-zinc-800 dark:text-zinc-200 tabular-nums">${formatStorageBytes(item.size)}</td>
+        <td class="py-2 px-3 text-zinc-500 text-[10px] tabular-nums">${item.mtime_str || '-'}</td>
+        <td class="py-2 px-3 text-center">
+          <div class="flex items-center justify-center gap-1.5">
+            <button onclick="openInExplorer('${escapePath(item.path)}')" class="btn-icon-action p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300" title="Buka di File Explorer">
+              <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="deleteSingleItem('${escapePath(item.path)}', '${escapeHtml(item.name)}')" class="btn-icon-action p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400" title="Hapus Berkas Ini">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </td>
+      </tr>`;
+  });
+
+  tbody.innerHTML = html;
+  safeCreateIcons();
+}
+
+// Subview 3: Old & Unused Items
+function filterOldByDays(days) {
+  storageOldFilterDays = days;
+  [30, 90, 180, 365].forEach((d) => {
+    const btn = document.getElementById(`btn-old-${d}`);
+    if (btn) {
+      if (d === days) {
+        btn.className = 'px-2.5 py-1 rounded text-xs font-semibold transition-all bg-white dark:bg-zinc-900 text-purple-600 dark:text-purple-400 shadow-xs';
+      } else {
+        btn.className = 'px-2.5 py-1 rounded text-xs font-semibold transition-all text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100';
+      }
+    }
+  });
+  renderOldItemsSubTab();
+}
+
+function renderOldItemsSubTab() {
+  const tbody = document.getElementById('table-old-items');
+  const summaryElem = document.getElementById('old-items-summary');
+  if (!tbody) return;
+
+  let items = (storageResults && storageResults.old_items) || [];
+  items = items.filter((item) => (item.age_days || 0) >= storageOldFilterDays);
+
+  // Sort by age descending
+  items.sort((a, b) => (b.age_days || 0) - (a.age_days || 0));
+
+  if (summaryElem) {
+    let totalBytes = items.reduce((acc, cur) => acc + (cur.size || 0), 0);
+    summaryElem.textContent = `Menampilkan ${items.length} item tidak aktif (> ${storageOldFilterDays} hari) · Total: ${formatStorageBytes(totalBytes)}`;
+  }
+
+  if (items.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="py-8 text-center text-zinc-500 text-xs">
+          Tidak ada berkas/folder yang lebih tua dari ${storageOldFilterDays} hari pada target saat ini.
+        </td>
+      </tr>`;
+    return;
+  }
+
+  let html = '';
+  items.slice(0, 150).forEach((item) => {
+    html += `
+      <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+        <td class="py-2 px-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="${item.is_dir ? 'folder' : 'file'}" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
+            <div class="truncate max-w-sm font-semibold text-zinc-900 dark:text-zinc-100" title="${escapeHtml(item.path)}">
+              ${escapeHtml(item.name)}
+            </div>
+          </div>
+          <div class="text-[10px] text-zinc-400 truncate max-w-sm pl-5 font-mono">${escapeHtml(item.path)}</div>
+        </td>
+        <td class="py-2 px-3 text-right font-bold text-zinc-800 dark:text-zinc-200 tabular-nums">${formatStorageBytes(item.size)}</td>
+        <td class="py-2 px-3 text-center">
+          <span class="badge-tag bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">${formatAgeDays(item.age_days || 0)}</span>
+        </td>
+        <td class="py-2 px-3 text-zinc-500 text-[10px] tabular-nums">${item.atime_str || item.mtime_str || '-'}</td>
+        <td class="py-2 px-3 text-center">
+          <div class="flex items-center justify-center gap-1.5">
+            <button onclick="openInExplorer('${escapePath(item.path)}')" class="btn-icon-action p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300" title="Buka di File Explorer">
+              <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="deleteSingleItem('${escapePath(item.path)}', '${escapeHtml(item.name)}')" class="btn-icon-action p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400" title="Hapus Berkas Ini">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </td>
+      </tr>`;
+  });
+
+  tbody.innerHTML = html;
+  safeCreateIcons();
+}
+
+// Subview 4: Duplicate Files Finder
+function renderDuplicatesSubTab() {
+  const container = document.getElementById('duplicates-container');
+  if (!container) return;
+
+  const groups = (storageResults && storageResults.duplicate_groups) || [];
+  if (groups.length === 0) {
+    container.innerHTML = `
+      <div class="app-surface p-8 text-center space-y-2">
+        <i data-lucide="check-check" class="w-8 h-8 text-emerald-500 mx-auto"></i>
+        <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">Tidak Ditemukan Berkas Duplikat</h4>
+        <p class="text-xs text-zinc-500">Semua berkas pada target pemindaian bersifat unik.</p>
+      </div>`;
+    safeCreateIcons();
+    updateDuplicateDeleteButton();
+    return;
+  }
+
+  let html = '';
+  groups.forEach((grp, gIdx) => {
+    const sizeStr = formatStorageBytes(grp.size);
+    const potentialWaste = formatStorageBytes(grp.size * (grp.count - 1));
+
+    html += `
+      <div class="dup-group-box p-3 space-y-2">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="copy" class="w-4 h-4 text-rose-500"></i>
+            <span class="font-bold text-xs text-zinc-900 dark:text-zinc-100">${escapeHtml(grp.file_name)}</span>
+            <span class="badge-tag bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300">${grp.count} Salinan Identik</span>
+          </div>
+          <div class="text-[11px] font-mono text-zinc-500">
+            Ukuran per file: <span class="font-bold text-zinc-700 dark:text-zinc-300">${sizeStr}</span> · Terbuang: <span class="font-bold text-rose-500">${potentialWaste}</span>
+          </div>
+        </div>
+
+        <div class="space-y-1.5 pt-1">`;
+
+    grp.files.forEach((f, fIdx) => {
+      const isChecked = selectedDuplicatePaths.has(f.path);
+      html += `
+        <div class="flex items-center justify-between gap-2 p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-[11px] font-mono">
+          <div class="flex items-center gap-2 truncate max-w-lg">
+            <input type="checkbox" id="chk-dup-${gIdx}-${fIdx}" onchange="toggleDuplicateItem('${escapePath(f.path)}')" class="w-3.5 h-3.5 rounded text-rose-600 focus:ring-rose-500 border-zinc-300 dark:border-zinc-600 cursor-pointer" ${isChecked ? 'checked' : ''}>
+            <span class="truncate text-zinc-700 dark:text-zinc-300" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</span>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <span class="text-zinc-400 text-[10px]">${f.mtime_str || '-'}</span>
+            <button onclick="openInExplorer('${escapePath(f.path)}')" class="btn-icon-action p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300" title="Buka di File Explorer">
+              <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>`;
+    });
+
+    html += `
+        </div>
+      </div>`;
+  });
+
+  container.innerHTML = html;
+  safeCreateIcons();
+  updateDuplicateDeleteButton();
+}
+
+function toggleDuplicateItem(path) {
+  if (selectedDuplicatePaths.has(path)) {
+    selectedDuplicatePaths.delete(path);
+  } else {
+    selectedDuplicatePaths.add(path);
+  }
+  updateDuplicateDeleteButton();
+}
+
+// Auto-select duplicates: keep newest or keep oldest
+function autoSelectDuplicates(strategy) {
+  selectedDuplicatePaths.clear();
+  const groups = (storageResults && storageResults.duplicate_groups) || [];
+
+  groups.forEach((grp) => {
+    if (!grp.files || grp.files.length <= 1) return;
+
+    // Sort files by mtime ascending
+    const sorted = [...grp.files].sort((a, b) => (a.mtime || 0) - (b.mtime || 0));
+
+    if (strategy === 'newest') {
+      // Keep newest (last item), delete all earlier
+      for (let i = 0; i < sorted.length - 1; i++) {
+        selectedDuplicatePaths.add(sorted[i].path);
+      }
+    } else if (strategy === 'oldest') {
+      // Keep oldest (first item), delete all later
+      for (let i = 1; i < sorted.length; i++) {
+        selectedDuplicatePaths.add(sorted[i].path);
+      }
+    }
+  });
+
+  renderDuplicatesSubTab();
+}
+
+function updateDuplicateDeleteButton() {
+  const btnDelete = document.getElementById('btn-delete-dup');
+  const txtDelete = document.getElementById('txt-btn-delete-dup');
+  const count = selectedDuplicatePaths.size;
+
+  if (btnDelete) btnDelete.disabled = count === 0;
+  if (txtDelete) txtDelete.textContent = `Hapus ${count} Salinan Terpilih`;
+}
+
+async function deleteSelectedDuplicates() {
+  const paths = Array.from(selectedDuplicatePaths);
+  if (paths.length === 0) return;
+
+  const confirmMsg = `Yakin ingin menghapus permanen ${paths.length} file salinan duplikat terpilih?\n\nFile asli yang dipertahankan tidak akan terhapus.`;
+  if (!confirm(confirmMsg)) return;
+
+  const btnDelete = document.getElementById('btn-delete-dup');
+  if (btnDelete) btnDelete.disabled = true;
+
+  try {
+    const res = await fetch('/api/storage/clean', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths })
+    });
+    const result = await res.json();
+    if (result.success) {
+      alert(`Pembersihan Duplikat Selesai!\n\nRuang berhasil dibebaskan: ${result.reclaimed_formatted}\nFile terhapus: ${result.deleted_count}`);
+      selectedDuplicatePaths.clear();
+      await loadStorageDrives();
+      await triggerStorageScan();
+    } else {
+      alert(`Pembersihan selesai dengan catatan: ${result.errors && result.errors.length ? result.errors[0] : 'Beberapa file mungkin sedang dibuka program lain.'}`);
+      await loadStorageDrives();
+      await triggerStorageScan();
+    }
+  } catch (err) {
+    alert(`Terjadi kesalahan: ${err.message}`);
+  } finally {
+    if (btnDelete) btnDelete.disabled = false;
+  }
+}
+
+// Open File or Folder in Windows Explorer
+async function openInExplorer(path) {
+  if (!path) return;
+  try {
+    const res = await fetch('/api/storage/open_explorer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      alert(`Gagal membuka Explorer: ${data.error || 'Jalur berkas tidak ditemukan'}`);
+    }
+  } catch (err) {
+    alert(`Kesalahan membuka explorer: ${err.message}`);
+  }
+}
+
+// Delete a single item with confirmation
+async function deleteSingleItem(path, name) {
+  if (!path) return;
+  const confirmMsg = `Yakin ingin menghapus ${name || path}?\n\nTindakan ini akan menghapus berkas dari disk secara permanen.`;
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    const res = await fetch('/api/storage/clean', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths: [path] })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`Berhasil menghapus: ${name || path}\nRuang dibebaskan: ${data.reclaimed_formatted}`);
+      await loadStorageDrives();
+      await triggerStorageScan();
+    } else {
+      alert(`Gagal menghapus: ${data.error || 'Berkas sedang digunakan program lain.'}`);
+    }
+  } catch (err) {
+    alert(`Terjadi kesalahan: ${err.message}`);
+  }
+}
+
+// Helper escape functions
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function escapePath(str) {
+  if (!str) return '';
+  return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}

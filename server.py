@@ -44,6 +44,7 @@ if backend_path not in sys.path:
 from collector import collect_all_disks_data, is_admin
 from hardware_profile import get_flash_technology_glossary
 import scanner
+import storage_manager
 
 PORT = 5550
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -148,6 +149,45 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
             self._send_json(result)
             return
 
+        elif parsed_path.path == "/api/storage/start_scan":
+            try:
+                drive_letters = body_data.get("drives", ["all"])
+                scan_duplicates = body_data.get("scan_duplicates", True)
+                min_large_mb = body_data.get("min_large_mb", 100)
+                sm = storage_manager.get_storage_manager()
+                ok, msg = sm.start_scan(drive_letters, scan_duplicates, min_large_mb)
+                self._send_json({"success": ok, "message": msg})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/storage/cancel_scan":
+            try:
+                sm = storage_manager.get_storage_manager()
+                ok = sm.cancel_scan()
+                self._send_json({"success": ok})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/storage/clean":
+            try:
+                paths = body_data.get("paths", [])
+                res = storage_manager.execute_cleanup(paths)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/storage/open_explorer":
+            try:
+                target_path = body_data.get("path", "")
+                ok, msg = storage_manager.open_in_explorer(target_path)
+                self._send_json({"success": ok, "message": msg})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
         self.send_response(404)
         self.end_headers()
 
@@ -250,6 +290,32 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 self._send_json({"success": False, "error": str(e)}, status=500)
             return
 
+        elif parsed_path.path == "/api/storage/drives":
+            try:
+                drives = storage_manager.get_available_drives()
+                self._send_json({"success": True, "drives": drives})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e), "drives": []}, status=500)
+            return
+
+        elif parsed_path.path == "/api/storage/scan_status":
+            try:
+                sm = storage_manager.get_storage_manager()
+                self._send_json(sm.get_status())
+            except Exception as e:
+                self._send_json({"is_scanning": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/storage/results":
+            try:
+                sm = storage_manager.get_storage_manager()
+                res = dict(sm.results)
+                res["success"] = True
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
         # Fallback ke file statis HTML/CSS/JS/Icons
         super().do_GET()
 
@@ -295,22 +361,19 @@ def launch_app_window(url):
 
 
 def is_server_already_running(port):
-    """Cek apakah instansi DiagnoseMyDisk lain sudah berjalan di port ini dengan versi terbaru."""
+    """Cek apakah instansi DiagnoseMyDisk lain sudah berjalan di port ini dengan versi v2.0.0 terbaru."""
     try:
-        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/disks", method="GET")
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/storage/drives", method="GET")
         with urllib.request.urlopen(req, timeout=1.5) as resp:
             if resp.status == 200:
-                data = json.loads(resp.read().decode("utf-8"))
-                # Jika server yang sedang aktif adalah versi lama (belum ada glossary), matikan agar versi baru naik
-                if not data.get("glossary"):
-                    try:
-                        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/shutdown", timeout=1.0)
-                        time.sleep(0.6)
-                    except Exception:
-                        pass
-                    return False
                 return True
     except Exception:
+        # Jika server aktif adalah versi lama (v1.x), matikan agar v2.0.0 bisa menggantikannya
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/shutdown", timeout=1.0)
+            time.sleep(0.6)
+        except Exception:
+            pass
         return False
 
 
