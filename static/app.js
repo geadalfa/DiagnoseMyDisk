@@ -5,7 +5,7 @@ let allDisks = [];
 let activeDiskIndex = 0;
 let currentMode = 'layman'; // 'layman', 'tech', atau 'scanner'
 let isDarkTheme = false;
-let currentLang = 'id'; // 'id' atau 'en'
+let currentLang = 'en'; // Default to English (v2.1.1)
 let retryCount = 0;
 let isAdminMode = true;
 
@@ -251,8 +251,13 @@ function initApp() {
   const shouldUseDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
   enableDarkTheme(shouldUseDark);
 
-  const savedLang = localStorage.getItem('diagnose_lang');
-  setLanguage(savedLang === 'en' ? 'en' : 'id', false);
+  // 1. Initial fast boot: check localStorage synchronously, default strictly to English 'en'
+  const localLang = localStorage.getItem('diagnose_lang');
+  const initialLang = (localLang === 'id' || localLang === 'en') ? localLang : 'en';
+  setLanguage(initialLang, false);
+
+  // 2. Background sync: synchronize with durable server-side profile preferences
+  syncServerPreferences();
 
   initSurfaceGrid();
   startHeartbeat();
@@ -282,8 +287,19 @@ if (document.readyState === 'loading') {
 
 // Penangan Penggantian Bahasa
 function setLanguage(lang, triggerRender = true) {
-  currentLang = lang;
-  localStorage.setItem('diagnose_lang', lang);
+  currentLang = (lang === 'id' || lang === 'en') ? lang : 'en';
+  try {
+    localStorage.setItem('diagnose_lang', currentLang);
+  } catch (e) {
+    console.warn('LocalStorage error:', e);
+  }
+
+  // Persist preference to local server profile for bulletproof cross-session persistence
+  fetch('/api/preferences', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ language: currentLang })
+  }).catch(() => {});
 
   const btnId = document.getElementById('btn-lang-id');
   const btnEn = document.getElementById('btn-lang-en');
@@ -386,6 +402,25 @@ function setLanguage(lang, triggerRender = true) {
   if (triggerRender && allDisks.length > 0) {
     renderDriveTabs();
     renderActiveDisk();
+  }
+  if (triggerRender && storageResults) {
+    renderStorageResults(storageResults);
+  }
+}
+
+// Background preferences synchronization (v2.1.1)
+async function syncServerPreferences() {
+  try {
+    const res = await fetch('/api/preferences');
+    const data = await res.json();
+    if (data.success && data.preferences && data.preferences.language) {
+      const serverLang = data.preferences.language;
+      if (serverLang !== currentLang && (serverLang === 'en' || serverLang === 'id')) {
+        setLanguage(serverLang, true);
+      }
+    }
+  } catch (err) {
+    // Fail silently to local storage
   }
 }
 

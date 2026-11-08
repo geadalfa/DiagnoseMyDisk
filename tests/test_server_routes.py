@@ -106,6 +106,23 @@ class TestServerRoutesIntegration(unittest.TestCase):
         self.assertTrue(data_post.get("success"))
         self.assertEqual(data["path"], data_post["path"])
 
+    def test_api_preferences(self):
+        """Test GET & POST /api/preferences for persistent user settings."""
+        # GET preferences
+        get_res = self._get_json("/api/preferences")
+        self.assertTrue(get_res.get("success"))
+        self.assertIn("preferences", get_res)
+
+        # POST preferences (change to id)
+        post_id = self._post_json("/api/preferences", {"language": "id"})
+        self.assertTrue(post_id.get("success"))
+        self.assertEqual(post_id["preferences"]["language"], "id")
+
+        # POST preferences (revert to en default)
+        post_en = self._post_json("/api/preferences", {"language": "en"})
+        self.assertTrue(post_en.get("success"))
+        self.assertEqual(post_en["preferences"]["language"], "en")
+
 
 if __name__ == "__main__":
     unittest.main()

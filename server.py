@@ -53,6 +53,39 @@ except ImportError:
 PORT = 5550
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
+# Persistent User Preferences Path (v2.1.1)
+PREFERENCES_FILE = os.path.join(
+    os.environ.get("LOCALAPPDATA", BASE_DIR),
+    "DiagnoseMyDisk_Profile",
+    "user_preferences.json"
+)
+
+def get_user_preferences():
+    """Membaca pengaturan preferensi pengguna (default bahasa Inggris)."""
+    try:
+        if os.path.exists(PREFERENCES_FILE):
+            with open(PREFERENCES_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+    except Exception:
+        pass
+    return {"language": "en"}
+
+def save_user_preferences(prefs):
+    """Menyimpan preferensi pengguna (seperti bahasa) ke file lokal."""
+    try:
+        os.makedirs(os.path.dirname(PREFERENCES_FILE), exist_ok=True)
+        current = get_user_preferences()
+        if isinstance(prefs, dict):
+            current.update(prefs)
+        with open(PREFERENCES_FILE, "w", encoding="utf-8") as f:
+            json.dump(current, f, indent=2)
+        return True
+    except Exception as e:
+        app_logger.log_error("Server", f"Gagal menyimpan preferensi: {e}")
+        return False
+
 # Cache data disk
 cached_disks_data = None
 cache_lock = threading.Lock()
@@ -179,6 +212,14 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                     self._send_json({"success": True, "message": "Log file opened in system editor."})
                 else:
                     self._send_json({"success": False, "error": "Log file not created yet."})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/preferences":
+            try:
+                ok = save_user_preferences(body_data)
+                self._send_json({"success": ok, "preferences": get_user_preferences()})
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=500)
             return
@@ -372,6 +413,14 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/preferences":
+            try:
+                prefs = get_user_preferences()
+                self._send_json({"success": True, "preferences": prefs})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e), "preferences": {"language": "en"}}, status=500)
             return
 
         elif parsed_path.path == "/api/logs":

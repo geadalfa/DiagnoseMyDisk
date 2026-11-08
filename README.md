@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v2.1.0-emerald.svg?logo=github&logoColor=white" alt="Release v2.1.0"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v2.1.1-emerald.svg?logo=github&logoColor=white" alt="Release v2.1.0"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
   <a href="#-jaminan-privasi-mutlak-kami-tidak-mengambil-data"><img src="https://img.shields.io/badge/Privacy-100%25%20UU%20PDP%20Compliant-blue.svg?logo=shield&logoColor=white" alt="UU PDP Compliant"></a>
@@ -33,20 +33,20 @@
 
 ---
 
-## 📥 Unduh & Pasang Sekarang (Download & Install v2.1.0)
+## 📥 Unduh & Pasang Sekarang (Download & Install v2.1.1)
 
 Tersedia versi siap pakai untuk Windows 10 & 11 (64-bit):
 
 | Paket Rilis | Deskripsi | Tautan Unduhan Langsung |
 | :--- | :--- | :--- |
-| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke sistem lokal, pembuatan shortcut desktop & start menu. Tanpa hak akses Administrator. | [**Unduh DiagnoseMyDisk_Setup.exe (v2.1.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v2.1.0/DiagnoseMyDisk_Setup.exe) |
-| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v2.1.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v2.1.0/DiagnoseMyDisk-v2.1.0-portable.zip) |
+| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke sistem lokal, pembuatan shortcut desktop & start menu. Tanpa hak akses Administrator. | [**Unduh DiagnoseMyDisk_Setup.exe (v2.1.1)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v2.1.1/DiagnoseMyDisk_Setup.exe) |
+| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v2.1.1-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v2.1.1/DiagnoseMyDisk-v2.1.1-portable.zip) |
 
 Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases).
 
 ---
 
-## 🌟 Master Architectural Feature Matrix (v2.1.0)
+## 🌟 Master Architectural Feature Matrix (v2.1.1)
 
 | Kategori | Fitur & Kapabilitas | Sub-Sistem / Engine | Invarian & Standar Teknis | Status |
 | :--- | :--- | :--- | :--- | :---: |
@@ -183,7 +183,7 @@ DiagnoseMyDisk/
 │   └── test_storage_manager.py # Unit test suite for storage engine, duplicates & folder inspector
 ├── app_icon.ico              # Windows PE executable icon
 ├── DiagnoseMyDisk.spec       # PyInstaller build specification (Clean standalone bundle)
-├── installer.iss             # Inno Setup Windows installer script (v2.1.0)
+├── installer.iss             # Inno Setup Windows installer script (v2.1.1)
 ├── release.py                # Automated GitHub release & asset deployment runner
 ├── server.py                 # Multi-threaded server, IPv4 direct routing, watchdog & auto-shutdown
 ├── run.bat                   # Quick development launcher
