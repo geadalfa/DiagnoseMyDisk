@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <b><a href="README.md">🇮🇩 Baca dalam Bahasa Indonesia</a> &nbsp;|&nbsp; <a href="README.en.md">🇬🇧 Read in English</a></b>
+</p>
+
+<p align="center">
   <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v2.1.1-emerald.svg?logo=github&logoColor=white" alt="Release v2.1.0"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
