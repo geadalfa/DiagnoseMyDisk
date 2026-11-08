@@ -90,6 +90,22 @@ class TestServerRoutesIntegration(unittest.TestCase):
         self.assertIn("log_file", data)
         self.assertIsInstance(data["logs"], list)
 
+    def test_api_storage_inspect_folder(self):
+        """Test GET & POST /api/storage/inspect_folder."""
+        # GET test on static folder
+        static_dir = os.path.join(PROJECT_ROOT, "static")
+        import urllib.parse
+        encoded_path = urllib.parse.quote(static_dir)
+        data = self._get_json(f"/api/storage/inspect_folder?path={encoded_path}")
+        self.assertTrue(data.get("success"))
+        self.assertIn("items", data)
+        self.assertGreater(len(data["items"]), 0)
+
+        # POST test
+        data_post = self._post_json("/api/storage/inspect_folder", {"path": static_dir})
+        self.assertTrue(data_post.get("success"))
+        self.assertEqual(data["path"], data_post["path"])
+
 
 if __name__ == "__main__":
     unittest.main()

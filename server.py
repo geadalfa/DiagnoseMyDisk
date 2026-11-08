@@ -191,6 +191,20 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 self._send_json({"success": False, "error": str(e)}, status=500)
             return
 
+        elif parsed_path.path == "/api/storage/inspect_folder":
+            try:
+                target_path = body_data.get("path", "")
+                if not target_path:
+                    self._send_json({"success": False, "error": "Field path harus disertakan."}, status=400)
+                    return
+                limit = int(body_data.get("limit", 100))
+                sm = storage_manager.get_storage_manager()
+                res = sm.inspect_directory(target_path, limit=limit)
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
         elif parsed_path.path == "/api/storage/cancel_scan":
             try:
                 sm = storage_manager.get_storage_manager()
@@ -341,6 +355,20 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 sm = storage_manager.get_storage_manager()
                 res = dict(sm.results)
                 res["success"] = True
+                self._send_json(res)
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/storage/inspect_folder":
+            try:
+                target_path = qs.get("path", [""])[0]
+                if not target_path:
+                    self._send_json({"success": False, "error": "Parameter path harus disertakan."}, status=400)
+                    return
+                limit = int(qs.get("limit", [100])[0])
+                sm = storage_manager.get_storage_manager()
+                res = sm.inspect_directory(target_path, limit=limit)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=500)

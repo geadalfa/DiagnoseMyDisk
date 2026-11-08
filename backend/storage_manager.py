@@ -696,6 +696,7 @@ class StorageManager:
                     item_copy = dict(item)
                     item_copy["size"] = sz
                     item_copy["size_formatted"] = format_bytes(sz)
+                    item_copy["is_dir"] = os.path.isdir(p)
                     recommendations.append(item_copy)
 
         # Urutkan berdasarkan ukuran terbesar
@@ -781,6 +782,74 @@ class StorageManager:
             "recommendations_cleanable": sum(r["size"] for r in recommendations if r.get("default_checked")),
             "recommendations_cleanable_formatted": format_bytes(sum(r["size"] for r in recommendations if r.get("default_checked")))
         }
+
+    def inspect_directory(self, path, limit=100):
+        """
+        Memeriksa dan mendaftar berkas-berkas di dalam folder tertentu.
+        Mengembalikan daftar item berurutan dari yang terbesar beserta metadata penting.
+        """
+        if not path or not os.path.exists(path):
+            return {"success": False, "error": "Direktori tidak ditemukan atau tidak dapat diakses."}
+
+        if not os.path.isdir(path):
+            return {"success": False, "error": "Jalur yang diberikan bukan direktori."}
+
+        try:
+            items = []
+            total_files = 0
+            total_dirs = 0
+            total_bytes = 0
+
+            with os.scandir(path) as it:
+                for entry in it:
+                    try:
+                        is_dir = entry.is_dir(follow_symlinks=False)
+                        st = entry.stat(follow_symlinks=False)
+                        sz = st.st_size if not is_dir else 0
+                        mtime = st.st_mtime
+                        mtime_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+
+                        if is_dir:
+                            total_dirs += 1
+                        else:
+                            total_files += 1
+                            total_bytes += sz
+
+                        ext = os.path.splitext(entry.name)[1].lower() if not is_dir else "folder"
+
+                        items.append({
+                            "name": entry.name,
+                            "path": entry.path,
+                            "is_dir": is_dir,
+                            "size": sz,
+                            "size_formatted": format_bytes(sz) if not is_dir else "Folder",
+                            "mtime": mtime,
+                            "mtime_str": mtime_str,
+                            "extension": ext
+                        })
+                    except (PermissionError, OSError):
+                        continue
+
+            # Urutkan: berkas terbesar dulu, lalu direktori
+            items.sort(key=lambda x: (not x["is_dir"], x["size"]), reverse=True)
+
+            return {
+                "success": True,
+                "path": path,
+                "total_items": len(items),
+                "total_files": total_files,
+                "total_dirs": total_dirs,
+                "total_bytes": total_bytes,
+                "total_bytes_formatted": format_bytes(total_bytes),
+                "items": items[:limit]
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+
+def inspect_directory(path, limit=100):
+    """Shortcut modul untuk memeriksa isi direktori."""
+    return get_storage_manager().inspect_directory(path, limit=limit)
 
 
 # Global Singleton Instance

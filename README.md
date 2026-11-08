@@ -5,44 +5,58 @@
 <h1 align="center">DiagnoseMyDisk</h1>
 
 <p align="center">
-  <b>Inspektur Kesehatan Hardware Penyimpanan, Forensik S.M.A.R.T Mendalam & Pembongkar Anomali Firmware untuk Windows</b>
+  <b>Inspektur Kesehatan Hardware Penyimpanan, Forensik S.M.A.R.T Mendalam, Manajemen Penyimpanan & Pembongkar Anomali Firmware untuk Windows</b>
 </p>
 
 <p align="center">
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v2.0.0-emerald.svg?logo=github&logoColor=white" alt="Release v2.0.0"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v2.1.0-emerald.svg?logo=github&logoColor=white" alt="Release v2.1.0"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
-  <a href="README.md"><img src="https://img.shields.io/badge/Architecture-Bad%20Sector%20%2B%20Drive%20Doctor-purple.svg" alt="Architecture"></a>
-  <a href="README.md"><img src="https://img.shields.io/badge/Offline-100%25%20Zero--CDN-10b981.svg" alt="Offline Ready"></a>
-  <a href="README.md"><img src="https://img.shields.io/badge/UI--UX-Anti--Slop%20Dark%20Mode-3f3f46.svg" alt="Anti-Slop UI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg" alt="License: CC BY-NC 4.0"></a>
+  <a href="#-jaminan-privasi-mutlak-kami-tidak-mengambil-data"><img src="https://img.shields.io/badge/Privacy-100%25%20UU%20PDP%20Compliant-blue.svg?logo=shield&logoColor=white" alt="UU PDP Compliant"></a>
+  <a href="#-jaminan-privasi-mutlak-kami-tidak-mengambil-data"><img src="https://img.shields.io/badge/Zero--Telemetry-No%20Data%20Collected-10b981.svg" alt="Zero Telemetry"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-CC%20BY--NC%204.0%20(Non--Commercial)-lightgrey.svg" alt="License: CC BY-NC 4.0"></a>
 </p>
 
 ---
 
-> **DiagnoseMyDisk** adalah utilitas desktop diagnostik hardware penyimpanan tingkat lanjut untuk Windows 10 & 11. Aplikasi ini membongkar manipulasi pelaporan firmware (*False 100% masking*), menghitung persentase kesehatan fisik sebenarnya (*True Health*) pada SSD NVMe, SSD SATA, dan HDD mekanikal, memindai **Bad Sector** permukaan piringan/sel secara visual (*Surface LBA Map*), memulihkan sistem file & mengoptimasi sel NAND (*Drive Doctor*), serta menyajikan telemetri S.M.A.R.T lengkap melalui antarmuka desktop berstandar **Anti-Slop Zinc Modern** dalam mode terang maupun gelap.
+> [!IMPORTANT]
+> ### 🛡️ Jaminan Privasi Mutlak: "KAMI TIDAK MENGAMBIL DATA"
+> **DiagnoseMyDisk menjunjung tinggi kedaulatan data pengguna dan mematuhi sepenuhnya ketentuan Undang-Undang Republik Indonesia No. 27 Tahun 2022 tentang Perlindungan Data Pribadi (UU PDP) serta standar privasi global:**
+>
+> 1. **100% Offline & Zero-Telemetry:** Tidak ada *tracking*, tidak ada *analytics*, tidak ada skrip pihak ketiga, dan tidak ada pengiriman data ke server *cloud* mana pun. Aplikasi berkomunikasi secara eksklusif pada socket *loopback* lokal komputer Anda (`127.0.0.1:5550`).
+> 2. **Data Anda Sepenuhnya Milik Anda:** DiagnoseMyDisk **TIDAK PERNAH** membaca, membuka, atau menyalin isi berkas pribadi, dokumen rahasia, riwayat peramban, maupun kredensial Anda. Pemindaian disk hanya membaca atribut ukuran berkas dan struktur direktori lokal untuk kalkulasi kuota ruang kosong.
+> 3. **Transparansi Penuh & Terbuka untuk Audit (Open Source):** Seluruh kode sumber terbuka 100% tanpa ada modul tertutup atau *obfuscation*. Siapa pun, baik auditor keamanan, pengembang independen, maupun pengguna umum, dapat mengaudit kode program untuk membuktikan bahwa tidak ada satu byte pun data pribadi Anda yang keluar dari komputer Anda.
 
 ---
 
+> **DiagnoseMyDisk** adalah utilitas desktop diagnostik hardware dan manajemen penyimpanan tingkat lanjut untuk Windows 10 & 11. Aplikasi ini membongkar manipulasi pelaporan firmware (*False 100% masking*), menghitung persentase kesehatan fisik sebenarnya (*True Health*) pada SSD NVMe, SSD SATA, dan HDD mekanikal, memindai **Bad Sector** permukaan piringan/sel secara visual (*Surface LBA Map*), memulihkan sistem file & mengoptimasi sel NAND (*Drive Doctor*), menyajikan analisis kuota disk gaya *Microsoft PC Manager*, mendeteksi berkas duplikat berbasis *SHA-256*, serta menyediakan **Inspeksi Isi Folder Interaktif** dan **Log Diagnostik Real-Time** melalui antarmuka desktop berstandar **Anti-Slop Zinc Modern**.
+
 ---
 
-## 📥 Unduh & Pasang Sekarang (Download & Install)
+## 📥 Unduh & Pasang Sekarang (Download & Install v2.1.0)
 
 Tersedia versi siap pakai untuk Windows 10 & 11 (64-bit):
 
 | Paket Rilis | Deskripsi | Tautan Unduhan Langsung |
 | :--- | :--- | :--- |
-| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke sistem lokal, pembuatan shortcut desktop & start menu. Tanpa hak akses Administrator. | [**Unduh DiagnoseMyDisk_Setup.exe**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v1.5.0/DiagnoseMyDisk_Setup.exe) |
-| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan DiagnoseMyDisk.exe. | [**Unduh DiagnoseMyDisk-v1.5.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v1.5.0/DiagnoseMyDisk-v1.5.0-portable.zip) |
+| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke sistem lokal, pembuatan shortcut desktop & start menu. Tanpa hak akses Administrator. | [**Unduh DiagnoseMyDisk_Setup.exe (v2.1.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v2.1.0/DiagnoseMyDisk_Setup.exe) |
+| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v2.1.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v2.1.0/DiagnoseMyDisk-v2.1.0-portable.zip) |
 
 Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases).
 
-## 🌟 Master Architectural Feature Matrix
+---
+
+## 🌟 Master Architectural Feature Matrix (v2.1.0)
 
 | Kategori | Fitur & Kapabilitas | Sub-Sistem / Engine | Invarian & Standar Teknis | Status |
 | :--- | :--- | :--- | :--- | :---: |
-| **Surface & Repair** | **Bad Sector Surface LBA Map** | ackend/scanner.py & UI | Memindai 200 blok fisik drive secara non-destruktif dengan sector-aligned I/O (kelipatan 512 bytes), mengukur latensi milidetik (ms) dan memetakan blok sehat, lemah, hingga bad sector. | ✅ ACTIVE |
-| | **Drive Doctor (CHKDSK & TRIM)** | ackend/scanner.py & UI | Memicu perbaikan cluster & metadata volume Windows (Repair-Volume), optimasi sel flash NAND (ReTrim), serta audit status Dirty Bit. | ✅ ACTIVE |
+| **Manajemen Folder** | **Inspeksi Folder Interaktif (Expand)** *(New v2.1.0)* | `backend/storage_manager.py` & UI | Klik pada baris folder (GPU Cache, Downloads, Browser Cache, Folder Besar) untuk membuka daftar berkas di dalamnya secara instan (urut ukuran terbesar, tanggal modifikasi, shortcut buka Explorer). | ✅ `ACTIVE` |
+| **Logging & Telemetri** | **Log Diagnostik Live (AI & Human Console)** *(New v2.0.0)* | `backend/app_logger.py` & UI | Perekaman ganda berkas log persisten (`diagnose_my_disk.log`) + *in-memory ring buffer* 1000 baris dengan live polling, copy to clipboard, dan buka instan di Notepad. | ✅ `ACTIVE` |
+| **Penyimpanan & Kuota** | **Segmented Storage Analyzer (PC Manager Style)** | `backend/storage_manager.py` & UI | Visualisasi segmented bar kapasitas disk (Berkas Pengguna, Aplikasi, Sistem Windows, Recycle Bin, Lainnya/Cache) untuk semua drive atau per-drive. | ✅ `ACTIVE` |
+| | **Deteksi Berkas Duplikat 2-Tier** | `backend/storage_manager.py` | Scanning duplikat cepat: Tier 1 verifikasi kesamaan ukuran + 4KB MD5 header, dilanjutkan Tier 2 hashing SHA-256 utuh dengan proteksi exclusion folder sistem WindowsApps. | ✅ `ACTIVE` |
+| | **Rekomendasi Pembersihan Cerdas** | `backend/storage_manager.py` | Mendeteksi penumpukan aman: shader cache GPU (NVIDIA DXCache), installer OTA driver, cache compiler (uv, pip, npm), peramban (Chrome, Edge), dan Windows Temp. | ✅ `ACTIVE` |
+| **Surface & Repair** | **Bad Sector Surface LBA Map** | `backend/scanner.py` & UI | Memindai 200 blok fisik drive secara non-destruktif dengan sector-aligned I/O (kelipatan 512 bytes), mengukur latensi milidetik (ms) dan memetakan blok sehat, lemah, hingga bad sector. | ✅ `ACTIVE` |
+| | **Drive Doctor (CHKDSK & TRIM)** | `backend/scanner.py` & UI | Memicu perbaikan cluster & metadata volume Windows (Repair-Volume), optimasi sel flash NAND (ReTrim), serta audit status Dirty Bit. | ✅ `ACTIVE` |
 | **Kalkulasi Kesehatan** | **Unmasking Firmware False 100%** | `backend/smart_decoder.py` | Mengabaikan kolom `Current` firmware statis; menghitung degradasi riil dari register mentah `0xA9`, relokasi `0x05`, dan bad block `0xA6`. | ✅ `ACTIVE` |
 | | **NVMe 2.0 True Health Engine** | `backend/smart_decoder.py` | Kepatuhan NVM Express 2.0 Log Page 02h: memvalidasi `Percentage Used` vs `Available Spare` & `Media Integrity Errors`. | ✅ `ACTIVE` |
 | | **Write Amplification (WAF)** | `backend/smart_decoder.py` | Rasio akumulasi penulisan data host terhadap penulisan fisik sel NAND (`HostWrites` vs `NandWrites`). | ✅ `ACTIVE` |
@@ -52,7 +66,7 @@ Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](h
 | **Runtime & Performa** | **100% Zero-CDN Offline Native** | `static/` | Tailwind CSS dan Lucide Icons dibundel lokal (`tailwind.min.js`, `lucide.min.js`). Berjalan 100% tanpa internet. | ✅ `ACTIVE` |
 | | **Koneksi IPv4 Instan** | `server.py` | Mengikat socket ke `127.0.0.1:5550` langsung; mengeliminasi latensi negosiasi IPv6 `[::1]` pada Windows. | ✅ `ACTIVE` |
 | | **Watchdog & Clean Auto-Shutdown** | `server.py` & `static/app.js` | Heartbeat 2.5s + `navigator.sendBeacon('/api/shutdown')`. Bebas dari *ghost background processes*. | ✅ `ACTIVE` |
-| **UI/UX & Desain** | **Anti-Slop Desktop Shell** | `static/index.html` & `style.css` | Viewport desktop terkunci (`h-screen overflow-hidden`), palet warna Zinc netral (OKLCH), angka tabular (`tabular-nums`). | ✅ `ACTIVE` |
+| **UI/UX & Desain** | **Anti-Slop Desktop Shell** | `static/index.html` & `style.css` | Viewport desktop terkunci (`h-screen overflow-hidden`), palet warna Zinc netral (OKLCH), angka tabular (`tabular-nums`), mode gelap berdefinisi tinggi. | ✅ `ACTIVE` |
 | | **Tabel Forensik S.M.A.R.T 7-Kolom** | `static/app.js` | Menampilkan Kondisi (3D spheres), Hex ID, Nama Atribut, Current, Worst, Ambang Batas Pabrikan (*Threshold*), dan Raw Hex/Dec. | ✅ `ACTIVE` |
 | | **Dukungan Bilingual Instan (ID / EN)** | `static/app.js` | Beralih bahasa secara real-time dalam satu klik tanpa refresh halaman. | ✅ `ACTIVE` |
 
@@ -62,58 +76,60 @@ Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](h
 
 | Tantangan & Masalah Lapangan | Pendekatan Aplikasi Diagnostik Standar | Solusi Rekayasa DiagnoseMyDisk | Dampak & Nilai Nyata |
 | :--- | :--- | :--- | :--- |
-| **Bias Normalisasi Firmware (*False 100% Good*)** | Membaca kolom `Current` mentah-mentah. Controller mengunci nilai di `100`, sehingga aplikasi tetap menampilkan "100% Good" meski SSD hampir tewas. | **Algoritma True Health Deterministik**: Membedah register vendor raw (`0xA9`, `0x05`, `0xA6`, `0xE8`), membandingkan jam terbang dan cadangan blok flash NAND. | Pengguna mengetahui kondisi SSD sebenarnya sebelum data penting lenyap mendadak. |
+| **Pelanggaran Privasi & Upload Telemetri** | Mengirim riwayat file, nama direktori, dan data perangkat keras ke server analitik *cloud*. | **100% Offline & Kepatuhan UU PDP**: Nol transmisi jaringan luar, eksekusi eksklusif di localhost `127.0.0.1:5550`. | Privasi terjamin mutlak; aman digunakan di komputer pribadi, kantor, maupun institusi rahasia (*Air-Gapped*). |
+| **Bias Normalisasi Firmware (*False 100% Good*)** | Membaca kolom `Current` mentah-mentah. Controller mengunci nilai di `100`, sehingga aplikasi tetap menampilkan "100% Good" meski SSD hampir rusak. | **Algoritma True Health Deterministik**: Membedah register vendor raw (`0xA9`, `0x05`, `0xA6`, `0xE8`), membandingkan jam terbang dan cadangan blok flash NAND. | Pengguna mengetahui kondisi SSD sebenarnya sebelum data penting hilang secara tiba-tiba. |
+| **Inspeksi Folder Lambat & Membuka Banyak Jendela** | Mengharuskan pengguna bolak-balik membuka File Explorer secara manual untuk melihat isi folder cache/unduhan. | **Inspeksi Folder Interaktif**: Satu klik pada baris folder langsung membuka sub-daftar berkas terurut ukuran terbesar di dalam UI. | Menghemat waktu verifikasi sebelum melakukan penghapusan atau pembersihan ruang disk. |
 | **Hilangnya S.M.A.R.T Tanpa Hak Akses Admin** | Gagal mengekstrak atribut WMI saat aplikasi dijalankan oleh akun pengguna biasa tanpa hak Administrator. Tabel S.M.A.R.T menjadi kosong. | **Multi-Tier Telemetry Cascade & Cache Reconstruction**: Membaca WMI non-blocking di Tier 1, lalu fallback otomatis ke cache hardware sistem lokal di Tier 2 & 3. | Aplikasi dapat dijalankan oleh siapa pun tanpa harus selalu klik kanan *"Run as Administrator"*. |
-| **Aplikasi Desktop Macet Akibat Ketergantungan CDN** | Menggunakan script CDN eksternal (`unpkg.com`, `cdn.tailwindcss.com`). Jika internet putus atau lambat, UI rusak total dan aplikasi crash. | **Zero-CDN Offline Bundling**: Seluruh aset script visual, ikon, dan styling tersimpan lokal di dalam biner aplikasi. | Aplikasi dapat dibuka kapan pun, di mana pun, bahkan saat komputer dalam kondisi *Air-Gapped* / Offline. |
+| **Aplikasi Desktop Macet Akibat Ketergantungan CDN** | Menggunakan script CDN eksternal (`unpkg.com`, `cdn.tailwindcss.com`). Jika internet putus atau lambat, UI rusak total dan aplikasi crash. | **Zero-CDN Offline Bundling**: Seluruh aset script visual, ikon, dan styling tersimpan lokal di dalam biner aplikasi. | Aplikasi dapat dibuka kapan pun, di mana pun, bahkan saat komputer tanpa koneksi internet. |
 | **Proses Hantu (*Ghost Background Processes*)** | Server lokal tetap berjalan diam-diam setelah jendela ditutup, memakan RAM dan mengunci port 5550 secara permanen. | **Watchdog Heartbeat & Graceful Shutdown**: Frontend mengirim heartbeat berkala; server otomatis melakukan *exit clean* begitu jendela ditutup. | Bersih tanpa sisa proses di Task Manager, tidak boros memori dan baterai. |
 
 ---
 
-## 🏛️ Alur Arsitektur Telemetri (Architecture Flow)
+## 🏛️ Alur Arsitektur Telemetri & Privasi
 
 ```mermaid
 flowchart TD
-    subgraph Hardware_Layer["Lapisan Hardware & Controller"]
-        D1["SSD SATA (e.g. ADATA SU650)"]
-        D2["SSD NVMe PCIe (e.g. ADATA LEGEND 900)"]
-        D3["HDD Mekanikal (e.g. WD Blue)"]
-    end
+    subgraph Privacy_Boundary["🛡️ Zona Keamanan Lokal (100% Offline / Kepatuhan UU PDP)"]
+        subgraph Hardware_Layer["Lapisan Hardware & Controller"]
+            D1["SSD SATA (e.g. ADATA SU650)"]
+            D2["SSD NVMe PCIe (e.g. ADATA LEGEND 900)"]
+            D3["HDD Mekanikal (e.g. WD Blue)"]
+        end
 
-    subgraph OS_Layer["Sub-Sistem Windows & WMI"]
-        WMI1["CIM Storage Subsystem (Win32_DiskDrive)"]
-        WMI2["Physical Disk Subsystem (Get-PhysicalDisk)"]
-        WMI3["Partition & Volume Manager (Get-Partition / Get-Volume)"]
-        CACHE["CrystalDiskInfo Hardware Cache (Smart.ini / DiskInfo.ini)"]
-    end
+        subgraph OS_Layer["Sub-Sistem Windows & WMI"]
+            WMI1["CIM Storage Subsystem (Win32_DiskDrive)"]
+            WMI2["Physical Disk Subsystem (Get-PhysicalDisk)"]
+            WMI3["Partition & Volume Manager (Get-Partition / Get-Volume)"]
+            CACHE["Hardware Telemetry Cache (Smart.ini / DiskInfo.ini)"]
+        end
 
-    subgraph Collector_Layer["Collector Engine (collector.py)"]
-        T1["Tier 1: Live CIM WMI Non-Blocking Query"]
-        T2["Tier 2: Hardware Cache INI Parser"]
-        T3["Tier 3: Autonomous Cache Reconstruction"]
-        DEC["Disk & Volume Mapping Engine"]
-    end
+        subgraph Engine_Layer["Engine Lokal (server.py:5550)"]
+            T1["Tier 1: Live CIM WMI Non-Blocking Query"]
+            T2["Tier 2: Hardware Cache INI Parser"]
+            T3["Tier 3: Autonomous Cache Reconstruction"]
+            DEC["Storage Manager & True Health Decoder"]
+            INSPECT["Folder Inspector (Direct Local Scandir)"]
+            LOG["Diagnostic Ring Buffer & App Logger"]
+        end
 
-    subgraph Decoder_Layer["Forensic Health Engine (smart_decoder.py)"]
-        F1["Firmware Masking Filter (Bypass Current 100)"]
-        F2["NVMe 2.0 Percentage Used & Spare Verifier"]
-        F3["True Health & Wear Leveling Evaluator"]
-    end
-
-    subgraph Desktop_UI["Anti-Slop Desktop Shell (Offline Native)"]
-        UI1["Mode Ringkasan (Diagnostik Fisik & Tips Pemeliharaan)"]
-        UI2["Mode Forensik S.M.A.R.T (7-Column Threshold Table)"]
-        HB["Watchdog Heartbeat & Clean Shutdown Controller"]
+        subgraph Desktop_UI["Antarmuka Pengguna Desktop (Anti-Slop Modern Zinc)"]
+            UI1["Mode Ringkasan (Diagnostik Fisik & Longevity Guidance)"]
+            UI2["Mode Forensik S.M.A.R.T (7-Kolom Threshold Table)"]
+            UI3["Manajemen Penyimpanan & Segmented Disk Analyzer"]
+            UI4["Expandable Folder View (Top Files Inspection)"]
+            UI5["Live Telemetry Diagnostic Console"]
+        end
     end
 
     Hardware_Layer --> OS_Layer
     WMI1 & WMI2 & WMI3 --> T1
     CACHE --> T2
     T1 -- Berhasil --> DEC
-    T1 -- Timeout / Gagal --> T2
+    T1 -- Timeout / Restriksi --> T2
     T2 -- Fallback Lengkap --> T3 --> DEC
-    DEC --> Decoder_Layer
-    Decoder_Layer --> Desktop_UI
-    Desktop_UI <-->|Heartbeat 2.5s| HB
+    DEC --> Desktop_UI
+    INSPECT --> UI4
+    LOG --> UI5
 ```
 
 ---
@@ -147,25 +163,33 @@ Sebagai bukti konkret pentingnya algoritma **True Health**, perhatikan perbedaan
 DiagnoseMyDisk/
 ├── backend/
 │   ├── __init__.py           # Package initializer
+│   ├── app_logger.py         # Dual logging engine (Persistent File + In-Memory Ring Buffer)
 │   ├── collector.py          # Multi-tier telemetry collector (WMI + Hardware Cache + Auto-Reconstruction)
-│   └── smart_decoder.py      # S.M.A.R.T raw register decoder, thresholds & True Health engine
+│   ├── hardware_profile.py   # Storage controller profiler & NAND flash guide
+│   ├── scanner.py            # Bad Sector surface LBA scanner & Drive Doctor repair
+│   ├── smart_decoder.py      # S.M.A.R.T raw register decoder, thresholds & True Health engine
+│   └── storage_manager.py    # Multi-drive storage analyzer, duplicate finder & interactive folder inspector
 ├── static/
-│   ├── app.js                # Anti-slop reactive frontend controller, safe icon handler & bilingual i18n
+│   ├── app.js                # Anti-slop reactive frontend controller & accordion folder expansion
 │   ├── index.html            # Contained desktop shell layout (Zinc palette, high information density)
-│   ├── style.css             # Neutral Zinc design tokens (OKLCH), 3D spheres, custom scrollbars
+│   ├── style.css             # Neutral Zinc design tokens (OKLCH), 3D spheres, high-contrast dark mode
 │   ├── lucide.min.js         # Offline bundled vector iconography (Zero external CDN)
 │   ├── tailwind.min.js       # Offline bundled reactive styling engine (Zero external CDN)
 │   ├── manifest.json         # PWA Manifest for Windows taskbar icon
 │   ├── favicon.ico           # Application icon
 │   └── icon-*.png            # High-resolution raster icons (16px, 32px, 192px, 512px)
+├── tests/
+│   ├── test_server_routes.py # Integration QA test suite for HTTP API endpoints
+│   └── test_storage_manager.py # Unit test suite for storage engine, duplicates & folder inspector
 ├── app_icon.ico              # Windows PE executable icon
 ├── DiagnoseMyDisk.spec       # PyInstaller build specification (Clean standalone bundle)
-├── installer.iss             # Inno Setup Windows installer script
+├── installer.iss             # Inno Setup Windows installer script (v2.1.0)
+├── release.py                # Automated GitHub release & asset deployment runner
 ├── server.py                 # Multi-threaded server, IPv4 direct routing, watchdog & auto-shutdown
 ├── run.bat                   # Quick development launcher
 ├── requirements.txt          # Python dependencies
 ├── LICENSE                   # Creative Commons Attribution-NonCommercial 4.0 (CC BY-NC 4.0)
-└── README.md                 # Dokumentasi teknis terpadu
+└── README.md                 # Dokumentasi teknis terpadu & jaminan kepatuhan UU PDP
 ```
 
 ---
@@ -210,6 +234,13 @@ iscc installer.iss
 ```
 *File installer setup mandiri `DiagnoseMyDisk_Setup.exe` akan tersimpan di direktori `installer_output/`.*
 
+### 4. Menjalankan Unit & Integration Tests (QA Standard)
+
+```powershell
+python -m unittest discover tests
+```
+*Seluruh 14 test suite wajib lulus (Exit Code 0).*
+
 ---
 
 ## 🎨 Standar Desain Anti-Slop UI/UX
@@ -223,9 +254,11 @@ DiagnoseMyDisk dibangun dengan mematuhi prinsip **Anti-Slop Software Engineering
 
 ---
 
-## 📄 Lisensi & Hak Cipta
+## 📄 Lisensi & Ketentuan Penggunaan (Open Source Non-Komersial)
 
 Didistribusikan di bawah lisensi **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)**.
 
-* **Non-Commercial:** Bebas digunakan, dipelajari, dimodifikasi, dan diaudit untuk keperluan pribadi, laboratorium, atau riset edukasi hardware. Dilarang keras diperjualbelikan atau dikomersialisasi ulang tanpa izin tertulis.
-* **Attribution:** Hak Cipta dan rekayasa arsitektur oleh **Alfa ([@geadalfa](https://github.com/geadalfa)) & Gemi**.
+* 🌐 **Open Source & Transparan:** Kode sumber ini bebas dibuka, dipelajari, dimodifikasi, dan diaudit oleh komunitas untuk tujuan edukasi, forensik hardware, dan penggunaan pribadi.
+* 🚫 **DILARANG KERAS DIKOMERSIALKAN:** Aplikasi ini beserta source code maupun biner turunannya **TIDAK BOLEH** dijual, diperjualbelikan, dimonetisasi, dipaketkan ke dalam software komersial berbayar, atau didistribusikan dengan memungut biaya apapun tanpa izin tertulis resmi dari pengembang.
+* ⚖️ **Kepatuhan Privasi:** Menjamin kepatuhan 100% terhadap UU Perlindungan Data Pribadi (UU PDP No. 27 Tahun 2022).
+* 🏷️ **Atribusi & Hak Cipta:** Rekayasa arsitektur dan kepemilikan oleh **Alfa ([@geadalfa](https://github.com/geadalfa)) & Gemi**.

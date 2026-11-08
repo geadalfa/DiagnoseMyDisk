@@ -1830,31 +1830,45 @@ function renderRecommendationsSubTab() {
   items.forEach((item, idx) => {
     const isChecked = selectedRecommendationIndices.has(idx);
     const sizeStr = formatStorageBytes(item.size);
+    const isFolder = item.is_dir !== false;
 
     html += `
-      <div class="storage-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isChecked ? 'ring-1 ring-emerald-500/30 bg-emerald-500/5' : ''}" id="rec-card-${idx}">
-        <div class="flex items-start gap-3">
-          <input type="checkbox" id="chk-rec-${idx}" onchange="toggleRecommendation(${idx})" class="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-600 cursor-pointer" ${isChecked ? 'checked' : ''}>
-          <div class="space-y-0.5">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">${escapeHtml(item.category)}</span>
-              <span class="badge-tag bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Aman Dihapus</span>
+      <div class="storage-card overflow-hidden transition-all duration-200 border border-zinc-200 dark:border-zinc-800 rounded-lg ${isChecked ? 'ring-1 ring-emerald-500/30 bg-emerald-500/5' : ''}" id="rec-card-${idx}">
+        <!-- Main Card Header Row (Clickable to Expand if Folder) -->
+        <div class="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isFolder ? 'cursor-pointer select-none hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors' : ''}" onclick="${isFolder ? `toggleRecommendationFolderExpand(${idx}, '${escapePath(item.path)}')` : ''}">
+          <div class="flex items-start gap-3 flex-1 min-w-0">
+            <!-- Checkbox with stopPropagation so checking it doesn't expand/collapse -->
+            <input type="checkbox" id="chk-rec-${idx}" onclick="event.stopPropagation()" onchange="toggleRecommendation(${idx})" class="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-600 cursor-pointer shrink-0" ${isChecked ? 'checked' : ''}>
+            <div class="space-y-0.5 flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">${escapeHtml(item.category)}</span>
+                <span class="badge-tag bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Aman Dihapus</span>
+                ${isFolder ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700/60 shadow-xs"><i data-lucide="chevron-right" id="rec-chevron-${idx}" class="w-3 h-3 transition-transform duration-200 text-zinc-400"></i><span id="rec-expand-lbl-${idx}">Klik untuk lihat isi</span></span>` : ''}
+              </div>
+              <p class="text-[11px] text-zinc-500 dark:text-zinc-400">${escapeHtml(item.description)}</p>
+              <div class="text-[10px] font-mono text-zinc-400 truncate max-w-md">${escapeHtml(item.path)}</div>
             </div>
-            <p class="text-[11px] text-zinc-500 dark:text-zinc-400">${escapeHtml(item.description)}</p>
-            <div class="text-[10px] font-mono text-zinc-400 truncate max-w-md">${escapeHtml(item.path)}</div>
+          </div>
+
+          <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-200 dark:border-zinc-800" onclick="event.stopPropagation()">
+            <div class="text-right">
+              <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">${sizeStr}</div>
+              <div class="text-[10px] text-zinc-400">Potensi Hemat</div>
+            </div>
+            <button onclick="openInExplorer('${escapePath(item.path)}')" class="btn-icon-action px-2.5 py-1.5 rounded text-xs flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-all shadow-xs" title="Buka di File Explorer">
+              <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
+              <span>Buka</span>
+            </button>
           </div>
         </div>
 
-        <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-200 dark:border-zinc-800">
-          <div class="text-right">
-            <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">${sizeStr}</div>
-            <div class="text-[10px] text-zinc-400">Potensi Hemat</div>
+        <!-- Accordion Child Panel (Loaded via /api/storage/inspect_folder) -->
+        ${isFolder ? `
+        <div id="rec-expand-panel-${idx}" class="hidden border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/70 p-3">
+          <div id="rec-expand-content-${idx}" class="text-xs text-zinc-500 font-mono">
+            <!-- Dynamically populated -->
           </div>
-          <button onclick="openInExplorer('${escapePath(item.path)}')" class="btn-icon-action px-2.5 py-1.5 rounded text-xs flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300" title="Buka di File Explorer">
-            <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
-            <span>Buka</span>
-          </button>
-        </div>
+        </div>` : ''}
       </div>`;
   });
 
@@ -2019,27 +2033,28 @@ function renderLargeItemsSubTab() {
   }
 
   let html = '';
-  items.slice(0, 150).forEach((item) => {
+  items.slice(0, 150).forEach((item, idx) => {
     const isFolder = item.is_dir;
     const typeBadge = isFolder
-      ? `<span class="badge-tag bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">Folder</span>`
+      ? `<span class="badge-tag bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 cursor-pointer" onclick="toggleLargeFolderExpand(${idx}, '${escapePath(item.path)}')">Folder ▾</span>`
       : `<span class="badge-tag bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Berkas</span>`;
 
     html += `
-      <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+      <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${isFolder ? 'cursor-pointer' : ''}" onclick="${isFolder ? `toggleLargeFolderExpand(${idx}, '${escapePath(item.path)}')` : ''}">
         <td class="py-2 px-3">
           <div class="flex items-center gap-2">
-            <i data-lucide="${isFolder ? 'folder' : 'file'}" class="w-3.5 h-3.5 text-zinc-400 shrink-0"></i>
+            <i data-lucide="${isFolder ? 'folder' : 'file'}" class="w-3.5 h-3.5 ${isFolder ? 'text-amber-500' : 'text-zinc-400'} shrink-0"></i>
+            ${isFolder ? `<i data-lucide="chevron-right" id="large-chevron-${idx}" class="w-3 h-3 text-zinc-400 transition-transform duration-200 shrink-0"></i>` : ''}
             <div class="truncate max-w-sm font-semibold text-zinc-900 dark:text-zinc-100" title="${escapeHtml(item.path)}">
               ${escapeHtml(item.name)}
             </div>
           </div>
           <div class="text-[10px] text-zinc-400 truncate max-w-sm pl-5 font-mono">${escapeHtml(item.path)}</div>
         </td>
-        <td class="py-2 px-3 text-center">${typeBadge}</td>
+        <td class="py-2 px-3 text-center" onclick="event.stopPropagation()">${typeBadge}</td>
         <td class="py-2 px-3 text-right font-bold text-zinc-800 dark:text-zinc-200 tabular-nums">${formatStorageBytes(item.size)}</td>
         <td class="py-2 px-3 text-zinc-500 text-[10px] tabular-nums">${item.mtime_str || '-'}</td>
-        <td class="py-2 px-3 text-center">
+        <td class="py-2 px-3 text-center" onclick="event.stopPropagation()">
           <div class="flex items-center justify-center gap-1.5">
             <button onclick="openInExplorer('${escapePath(item.path)}')" class="btn-icon-action p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300" title="Buka di File Explorer">
               <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
@@ -2049,7 +2064,13 @@ function renderLargeItemsSubTab() {
             </button>
           </div>
         </td>
-      </tr>`;
+      </tr>
+      ${isFolder ? `
+      <tr id="large-expand-row-${idx}" class="hidden bg-zinc-50/80 dark:bg-zinc-950/80">
+        <td colspan="5" class="p-3 border-t border-b border-zinc-200 dark:border-zinc-800">
+          <div id="large-expand-content-${idx}" class="text-xs text-zinc-500 font-mono"></div>
+        </td>
+      </tr>` : ''}`;
   });
 
   tbody.innerHTML = html;
@@ -2476,4 +2497,187 @@ async function clearAppLogs() {
   } catch (err) {
     console.error('Failed to clear logs:', err);
   }
+}
+
+// ==============================================================================
+// INTERACTIVE FOLDER INSPECTION & EXPANSION CONTROLLER (v2.1.0)
+// ==============================================================================
+const expandedFoldersCache = new Map();
+
+async function toggleRecommendationFolderExpand(idx, path) {
+  const panel = document.getElementById(`rec-expand-panel-${idx}`);
+  const chevron = document.getElementById(`rec-chevron-${idx}`);
+  const lbl = document.getElementById(`rec-expand-lbl-${idx}`);
+  const content = document.getElementById(`rec-expand-content-${idx}`);
+  if (!panel || !chevron) return;
+
+  const isHidden = panel.classList.contains('hidden');
+  if (isHidden) {
+    panel.classList.remove('hidden');
+    chevron.classList.add('rotate-90');
+    chevron.classList.add('text-blue-500');
+    if (lbl) lbl.textContent = 'Tutup isi folder';
+
+    if (expandedFoldersCache.has(path)) {
+      renderFolderFileList(content, expandedFoldersCache.get(path));
+      return;
+    }
+
+    content.innerHTML = `
+      <div class="flex items-center gap-2.5 text-xs text-zinc-500 dark:text-zinc-400 py-3 px-2 justify-center font-mono">
+        <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-500"></i>
+        <span>Memindai daftar berkas di dalam folder...</span>
+      </div>`;
+    safeCreateIcons();
+
+    try {
+      const res = await fetch(`/api/storage/inspect_folder?path=${encodeURIComponent(path)}&limit=100`);
+      const data = await res.json();
+      if (data.success) {
+        expandedFoldersCache.set(path, data);
+        renderFolderFileList(content, data);
+      } else {
+        content.innerHTML = `
+          <div class="p-3 text-xs text-rose-500 font-mono bg-rose-500/10 rounded border border-rose-500/20">
+            Gagal membaca folder: ${escapeHtml(data.error || 'Akses ditolak atau folder tidak ditemukan.')}
+          </div>`;
+      }
+    } catch (err) {
+      content.innerHTML = `
+        <div class="p-3 text-xs text-rose-500 font-mono bg-rose-500/10 rounded border border-rose-500/20">
+          Kesalahan jaringan saat memindai: ${escapeHtml(err.message)}
+        </div>`;
+    }
+  } else {
+    panel.classList.add('hidden');
+    chevron.classList.remove('rotate-90');
+    chevron.classList.remove('text-blue-500');
+    if (lbl) lbl.textContent = 'Klik untuk lihat isi';
+  }
+}
+
+async function toggleLargeFolderExpand(idx, path) {
+  const row = document.getElementById(`large-expand-row-${idx}`);
+  const chevron = document.getElementById(`large-chevron-${idx}`);
+  const content = document.getElementById(`large-expand-content-${idx}`);
+  if (!row || !content) return;
+
+  const isHidden = row.classList.contains('hidden');
+  if (isHidden) {
+    row.classList.remove('hidden');
+    if (chevron) {
+      chevron.classList.add('rotate-90');
+      chevron.classList.add('text-blue-500');
+    }
+
+    if (expandedFoldersCache.has(path)) {
+      renderFolderFileList(content, expandedFoldersCache.get(path));
+      return;
+    }
+
+    content.innerHTML = `
+      <div class="flex items-center gap-2.5 text-xs text-zinc-500 dark:text-zinc-400 py-3 px-2 justify-center font-mono">
+        <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-500"></i>
+        <span>Memindai daftar berkas di dalam folder...</span>
+      </div>`;
+    safeCreateIcons();
+
+    try {
+      const res = await fetch(`/api/storage/inspect_folder?path=${encodeURIComponent(path)}&limit=100`);
+      const data = await res.json();
+      if (data.success) {
+        expandedFoldersCache.set(path, data);
+        renderFolderFileList(content, data);
+      } else {
+        content.innerHTML = `
+          <div class="p-3 text-xs text-rose-500 font-mono bg-rose-500/10 rounded border border-rose-500/20">
+            Gagal membaca folder: ${escapeHtml(data.error || 'Akses ditolak atau folder tidak ditemukan.')}
+          </div>`;
+      }
+    } catch (err) {
+      content.innerHTML = `
+        <div class="p-3 text-xs text-rose-500 font-mono bg-rose-500/10 rounded border border-rose-500/20">
+          Kesalahan jaringan saat memindai: ${escapeHtml(err.message)}
+        </div>`;
+    }
+  } else {
+    row.classList.add('hidden');
+    if (chevron) {
+      chevron.classList.remove('rotate-90');
+      chevron.classList.remove('text-blue-500');
+    }
+  }
+}
+
+function renderFolderFileList(container, data) {
+  if (!container) return;
+  const items = data.items || [];
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="py-3 px-2 text-center text-xs text-zinc-400 font-mono">
+        Folder ini kosong (0 berkas).
+      </div>`;
+    return;
+  }
+
+  let html = `
+    <div class="space-y-2">
+      <div class="flex items-center justify-between text-[11px] font-mono text-zinc-500 dark:text-zinc-400 pb-1.5 border-b border-zinc-200 dark:border-zinc-800 flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-zinc-800 dark:text-zinc-200">${data.total_items} item teratas</span>
+          <span>•</span>
+          <span class="text-zinc-500">${data.total_files} berkas (${data.total_bytes_formatted}), ${data.total_dirs} sub-folder</span>
+        </div>
+        <span class="text-[10px] text-zinc-400">Urut dari ukuran terbesar</span>
+      </div>
+
+      <div class="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scroll">`;
+
+  items.forEach((file) => {
+    const isDir = file.is_dir;
+    let iconName = isDir ? 'folder' : 'file';
+    let iconColor = isDir ? 'text-amber-500' : 'text-blue-400';
+
+    if (!isDir) {
+      const ext = (file.extension || '').toLowerCase();
+      if (['.png', '.jpg', '.jpeg', '.webp', '.ico', '.svg'].includes(ext)) {
+        iconName = 'image';
+        iconColor = 'text-emerald-400';
+      } else if (['.zip', '.rar', '.7z', '.tar', '.gz'].includes(ext)) {
+        iconName = 'archive';
+        iconColor = 'text-amber-400';
+      } else if (['.exe', '.msi', '.dll'].includes(ext)) {
+        iconName = 'cpu';
+        iconColor = 'text-purple-400';
+      } else if (['.log', '.txt', '.json', '.xml', '.yaml'].includes(ext)) {
+        iconName = 'file-text';
+        iconColor = 'text-zinc-400';
+      }
+    }
+
+    html += `
+      <div class="flex items-center justify-between gap-3 p-1.5 rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800/60 transition-colors text-xs font-mono group">
+        <div class="flex items-center gap-2 min-w-0 flex-1">
+          <i data-lucide="${iconName}" class="w-3.5 h-3.5 shrink-0 ${iconColor}"></i>
+          <span class="font-medium text-zinc-800 dark:text-zinc-200 truncate" title="${escapeHtml(file.path)}">
+            ${escapeHtml(file.name)}
+          </span>
+          ${isDir ? '<span class="text-[9px] px-1 rounded bg-amber-500/10 text-amber-500 shrink-0">Folder</span>' : ''}
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+          <span class="text-[11px] text-zinc-400 hidden sm:inline tabular-nums">${file.mtime_str || '-'}</span>
+          <span class="font-semibold text-zinc-900 dark:text-zinc-100 tabular-nums min-w-[70px] text-right">${file.size_formatted}</span>
+          <button onclick="openInExplorer('${escapePath(file.path)}')" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all" title="Buka berkas di File Explorer">
+            <i data-lucide="folder-open" class="w-3 h-3"></i>
+          </button>
+        </div>
+      </div>`;
+  });
+
+  html += `
+      </div>
+    </div>`;
+
+  container.innerHTML = html;
+  safeCreateIcons();
 }

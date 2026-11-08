@@ -162,6 +162,29 @@ class TestStorageManagerEngine(unittest.TestCase):
         self.assertTrue(res["success"])
         self.assertEqual(res["deleted_count"], 0)
 
+    def test_inspect_directory(self):
+        """Ensure inspect_directory returns items, metadata, and handles errors safely."""
+        # Test inspect top sandbox directory (contains FolderA and FolderB)
+        res_top = self.mgr.inspect_directory(self.test_dir, limit=50)
+        self.assertTrue(res_top["success"])
+        self.assertEqual(res_top["total_dirs"], 2)
+        top_names = [item["name"] for item in res_top["items"]]
+        self.assertIn("FolderA", top_names)
+        self.assertIn("FolderB", top_names)
+
+        # Test inspect sub_a directory (contains document_orig.dat and large_archive.bin)
+        res_sub = self.mgr.inspect_directory(self.sub_a, limit=50)
+        self.assertTrue(res_sub["success"])
+        self.assertEqual(res_sub["total_files"], 2)
+        sub_names = [item["name"] for item in res_sub["items"]]
+        self.assertIn("document_orig.dat", sub_names)
+        self.assertIn("large_archive.bin", sub_names)
+
+        # Nonexistent path test
+        res_bad = self.mgr.inspect_directory(os.path.join(self.test_dir, "nonexistent"))
+        self.assertFalse(res_bad["success"])
+        self.assertIn("error", res_bad)
+
 
 if __name__ == "__main__":
     unittest.main()
