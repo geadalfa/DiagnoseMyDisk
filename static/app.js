@@ -1,11 +1,20 @@
-// app.js - Frontend controller for DiagnoseMyDisk
+// app.js - Frontend controller for DiagnoseMyDisk v3.0.0
 // Arsitektur telemetri deterministik & antarmuka berstandar desktop Anti-Slop
+
+const APP_TOKEN = (document.querySelector('meta[name="app-token"]') || {}).content || '';
+const nativeFetch = window.fetch.bind(window);
+
+async function apiFetch(input, init = {}) {
+  const options = { ...init };
+  options.headers = { ...(init.headers || {}), 'X-App-Token': APP_TOKEN };
+  return nativeFetch(input, options);
+}
 
 let allDisks = [];
 let activeDiskIndex = 0;
 let currentMode = 'layman'; // 'layman', 'tech', atau 'scanner'
 let isDarkTheme = false;
-let currentLang = 'en'; // Default to English (v2.1.1)
+let currentLang = 'en'; // Default to English (v3.0.0)
 let retryCount = 0;
 let isAdminMode = true;
 
@@ -234,6 +243,77 @@ const I18N = {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Shared UI utilities
+// ---------------------------------------------------------------------------
+function showToast(message, type = 'info', duration = 4200) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const palette = {
+    success: 'border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-100',
+    error: 'border-rose-500/40 bg-rose-50 dark:bg-rose-950/60 text-rose-900 dark:text-rose-100',
+    warning: 'border-amber-500/40 bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-100',
+    info: 'border-blue-500/40 bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-100',
+  };
+  const icons = { success: 'check-circle-2', error: 'alert-octagon', warning: 'alert-triangle', info: 'info' };
+  const el = document.createElement('div');
+  el.className = `pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs font-medium shadow-lg transition-all ${palette[type] || palette.info}`;
+  el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  el.innerHTML = `<i data-lucide="${icons[type] || 'info'}" class="w-4 h-4 shrink-0 mt-0.5"></i><span class="leading-relaxed">${escapeHtml(message)}</span>`;
+  container.appendChild(el);
+  safeCreateIcons();
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(6px)';
+    setTimeout(() => el.remove(), 180);
+  }, duration);
+}
+
+function getDataSourceMeta(disk) {
+  const source = disk.data_source || 'unavailable';
+  if (source === 'live-wmi') {
+    return {
+      key: source,
+      label: currentLang === 'en' ? 'LIVE WMI' : 'WMI LIVE',
+      detail: currentLang === 'en' ? 'Live registers via Windows WMI/CIM' : 'Register live via Windows WMI/CIM',
+      className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    };
+  }
+  if (source === 'cdi-cache') {
+    const date = disk.data_source_date ? ` · ${disk.data_source_date}` : '';
+    return {
+      key: source,
+      label: currentLang === 'en' ? 'CDI CACHE' : 'CACHE CDI',
+      detail: (currentLang === 'en' ? 'Historical CrystalDiskInfo snapshot' : 'Snapshot historis CrystalDiskInfo') + date,
+      className: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    };
+  }
+  return {
+    key: source,
+    label: currentLang === 'en' ? 'UNAVAILABLE' : 'TIDAK TERSEDIA',
+    detail: currentLang === 'en' ? 'Telemetry could not be read. Run as Administrator.' : 'Telemetri tidak dapat dibaca. Jalankan sebagai Administrator.',
+    className: 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300',
+  };
+}
+
+function jsPathArg(path) {
+  return encodeURIComponent(String(path || '')).replace(/'/g, '%27');
+}
+
+function txt(en, id) {
+  return currentLang === 'en' ? en : id;
+}
+
+function formatNumberOrDash(value, suffix = '') {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return 'N/A';
+  return `${Number(value).toLocaleString()}${suffix}`;
+}
+
+function healthValue(ha) {
+  const value = ha && ha.true_health !== undefined ? ha.true_health : null;
+  return value === null || Number.isNaN(Number(value)) ? null : Number(value);
+}
+
 // Helper eksekusi ikon Lucide yang aman
 function safeCreateIcons() {
   if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
@@ -266,17 +346,11 @@ function initApp() {
 
 // Heartbeat & lifecycle: memastikan server backend otomatis berhenti saat jendela desktop ditutup
 function startHeartbeat() {
+  // The server watchdog exits after the heartbeat stops for ~10 seconds.
+  // Do not call /api/shutdown here: a simple reload must not kill the backend.
   setInterval(() => {
-    fetch('/api/heartbeat').catch(() => {});
+    apiFetch('/api/heartbeat').catch(() => {});
   }, 2500);
-
-  window.addEventListener('beforeunload', () => {
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/shutdown');
-    } else {
-      fetch('/api/shutdown', { method: 'POST', keepalive: true }).catch(() => {});
-    }
-  });
 }
 
 if (document.readyState === 'loading') {
@@ -295,7 +369,7 @@ function setLanguage(lang, triggerRender = true) {
   }
 
   // Persist preference to local server profile for bulletproof cross-session persistence
-  fetch('/api/preferences', {
+  apiFetch('/api/preferences', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ language: currentLang })
@@ -325,6 +399,36 @@ function setLanguage(lang, triggerRender = true) {
   const txtStorageSubtitle = document.getElementById('txt-storage-subtitle');
   if (txtStorageSubtitle && t.storageSubtitle) txtStorageSubtitle.textContent = t.storageSubtitle;
   document.getElementById('txt-refresh').textContent = t.refresh;
+  const exportLabel = document.getElementById('txt-export-report');
+  if (exportLabel) exportLabel.textContent = currentLang === 'en' ? 'Export' : 'Ekspor';
+
+  const storageLabels = {
+    'txt-btn-storage-scan': ['Scan Disk', 'Pindai Disk'],
+    'lbl-rec-cleanable': ['RECLAIMABLE', 'POTENSI HEMAT'],
+    'txt-rec-banner-title': ['Safe cleanup recommendations', 'Pembersihan aman rekomendasi'],
+    'txt-rec-banner-sub': ['Remove installer caches, crash dumps, and temporary files without touching personal data.', 'Hapus cache installer, crash dump, dan file temporary tanpa mengganggu data pribadi.'],
+    'txt-sub-recommend': ['Cleanup recommendations', 'Rekomendasi pembersihan'],
+    'txt-sub-large': ['Large files & folders', 'Berkas & folder besar'],
+    'txt-sub-old': ['Old files & apps', 'Berkas / aplikasi lawas'],
+    'txt-sub-dup': ['Duplicate files', 'Berkas duplikat'],
+    'lbl-large-filter': ['Size:', 'Ukuran:'],
+    'lbl-large-type': ['Type:', 'Tipe:'],
+    'lbl-large-sort': ['Order:', 'Urutan:'],
+    'lbl-old-filter': ['Inactive for:', 'Batas ketidakaktifan:'],
+    'txt-dup-banner-title': ['Identical duplicate file management', 'Manajemen berkas duplikat identik'],
+    'txt-dup-banner-sub': ['Select the copies to remove and keep the original file intact.', 'Pilih salinan yang ingin dihapus tanpa kehilangan berkas asli.'],
+    'btn-dup-keep-newest': ['Keep newest', 'Pertahankan terbaru'],
+    'btn-dup-keep-oldest': ['Keep oldest', 'Pertahankan tertua'],
+    'lbl-seg-user': ['User files', 'Berkas pengguna'],
+    'lbl-seg-app': ['Applications', 'Aplikasi'],
+    'lbl-seg-system': ['Windows system', 'Sistem Windows'],
+    'lbl-seg-recycle': ['Recycle Bin', 'Tempat sampah'],
+    'lbl-seg-other': ['Other / unclassified', 'Lainnya / belum terklasifikasi'],
+  };
+  Object.entries(storageLabels).forEach(([id, labels]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = txt(labels[0], labels[1]);
+  });
   document.getElementById('txt-masking-title').textContent = t.maskingTitle;
   document.getElementById('txt-masking-badge').textContent = t.maskingBadge;
   document.getElementById('txt-health-status-header').textContent = t.healthStatusHeader;
@@ -408,10 +512,10 @@ function setLanguage(lang, triggerRender = true) {
   }
 }
 
-// Background preferences synchronization (v2.1.1)
+// Background preferences synchronization (v3.0.0)
 async function syncServerPreferences() {
   try {
-    const res = await fetch('/api/preferences');
+    const res = await apiFetch('/api/preferences');
     const data = await res.json();
     if (data.success && data.preferences && data.preferences.language) {
       const serverLang = data.preferences.language;
@@ -484,6 +588,18 @@ function setMode(mode) {
   if (viewScanner) viewScanner.classList.toggle('hidden', mode !== 'scanner');
   if (viewStorage) viewStorage.classList.toggle('hidden', mode !== 'storage');
 
+  // Storage mode is a workspace of its own: hide drive hero/selector clutter.
+  const focusStorage = mode === 'storage';
+  ['drive-selector-section', 'disk-hero-section', 'telemetry-gap-banner'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', focusStorage);
+  });
+  const maskingBanner = document.getElementById('masking-banner');
+  if (maskingBanner && focusStorage) maskingBanner.classList.add('hidden');
+  if (!focusStorage && allDisks.length > 0) {
+    renderActiveDisk();
+  }
+
   if (mode === 'storage') {
     initStorageView();
   }
@@ -494,13 +610,15 @@ function setMode(mode) {
 // Relaunch as Administrator Action
 async function relaunchAsAdmin() {
   try {
-    const resp = await fetch('/api/relaunch_admin', { method: 'POST' });
+    const resp = await apiFetch('/api/relaunch_admin', { method: 'POST' });
     const data = await resp.json();
     if (data.success) {
-      alert(currentLang === 'en' ? 'Restarting application with Administrator privileges...' : 'Memulai ulang aplikasi dengan hak Administrator...');
+      showToast(currentLang === 'en' ? 'Restarting application with Administrator privileges...' : 'Memulai ulang aplikasi dengan hak Administrator...', 'info');
+    } else {
+      showToast(data.error || 'Gagal memulai ulang aplikasi.', 'error');
     }
   } catch (err) {
-    console.error('Error relaunching:', err);
+    showToast(`Gagal memulai ulang: ${err.message}`, 'error');
   }
 }
 
@@ -516,7 +634,7 @@ async function fetchDisksData(isRefresh = false) {
 
   try {
     const url = isRefresh ? '/api/refresh' : '/api/disks';
-    const resp = await fetch(url, { cache: 'no-store' });
+    const resp = await apiFetch(url, { cache: 'no-store' });
     if (!resp.ok) throw new Error(`HTTP error ${resp.status}`);
     const data = await resp.json();
 
@@ -584,45 +702,46 @@ function renderDriveTabs() {
   container.innerHTML = allDisks.map((disk, idx) => {
     const isActive = idx === activeDiskIndex;
     const ha = disk.health_analysis || {};
-    const trueHealth = ha.true_health !== undefined ? ha.true_health : 100;
-    const reportedHealth = ha.reported_health !== undefined ? ha.reported_health : 100;
+    const trueHealth = healthValue(ha);
     const isMasking = ha.is_masking || false;
+    const source = getDataSourceMeta(disk);
 
-    let badgeClass = 'health-badge-good';
-    let statusLabel = 'Good';
-
-    if (trueHealth < 60) {
-      badgeClass = 'health-badge-bad';
-      statusLabel = 'Bad';
-    } else if (trueHealth < 90 || isMasking) {
-      badgeClass = 'health-badge-caution';
-      statusLabel = 'Caution';
+    let badgeClass = 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200';
+    if (trueHealth !== null) {
+      if (trueHealth < 60) {
+        badgeClass = 'health-badge-bad';
+      } else if (trueHealth < 90 || isMasking) {
+        badgeClass = 'health-badge-caution';
+      } else {
+        badgeClass = 'health-badge-good';
+      }
     }
 
     const driveLetters = disk.drive_letters_str || '-';
-    const sizeGb = disk.size_gb || 0;
+    const sizeGb = disk.size_gb ? `${disk.size_gb} GB` : 'N/A';
     const hw = disk.hardware_profile || {};
     const mediaBadge = hw.cell_tech_name ? (hw.cell_tech_name.includes('TLC') ? 'TLC' : (hw.cell_tech_name.includes('QLC') ? 'QLC' : (hw.cell_tech_name.includes('SMR') ? 'SMR' : disk.bus_type))) : disk.bus_type;
 
     return `
-      <div onclick="selectDisk(${idx})" class="disk-tab-card ${isActive ? 'active' : ''}">
+      <div onclick="selectDisk(${idx})" class="disk-tab-card ${isActive ? 'active' : ''}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectDisk(${idx});}">
         <div class="flex items-start justify-between gap-2">
           <div class="space-y-0.5 truncate">
             <div class="flex items-center gap-1.5">
-              <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">${disk.name}</span>
+              <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">${escapeHtml(disk.name)}</span>
+              <span class="px-1 py-0.2 rounded text-[9px] font-mono font-bold border ${source.className}" title="${escapeHtml(source.detail)}">${source.label}</span>
             </div>
             <div class="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono flex items-center gap-1.5">
-              <span class="font-bold text-blue-600 dark:text-blue-400">${sizeGb} GB</span>
+              <span class="font-bold text-blue-600 dark:text-blue-400">${sizeGb}</span>
               <span>•</span>
-              <span class="px-1 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-[10px]">${mediaBadge}</span>
+              <span class="px-1 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-[10px]">${escapeHtml(mediaBadge)}</span>
               <span>•</span>
-              <span class="font-bold text-zinc-700 dark:text-zinc-300">${driveLetters}</span>
+              <span class="font-bold text-zinc-700 dark:text-zinc-300">${escapeHtml(driveLetters)}</span>
             </div>
           </div>
           
           <div class="shrink-0 flex flex-col items-end">
             <span class="${badgeClass} px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-tight">
-              ${trueHealth}%
+              ${trueHealth === null ? 'N/A' : `${trueHealth}%`}
             </span>
             ${isMasking ? '<span class="text-[9px] text-rose-600 font-bold tracking-tighter">MASKED</span>' : ''}
           </div>
@@ -649,14 +768,40 @@ function renderActiveDisk() {
   const t = I18N[currentLang];
   const ha = disk.health_analysis || {};
   const metrics = ha.metrics || {};
-  const trueHealth = ha.true_health !== undefined ? ha.true_health : 100;
-  const reportedHealth = ha.reported_health !== undefined ? ha.reported_health : 100;
+  const trueHealth = healthValue(ha);
+  const reportedHealth = ha.reported_health !== undefined ? ha.reported_health : null;
   const isMasking = ha.is_masking || false;
+  const source = getDataSourceMeta(disk);
+  const gaps = Array.isArray(disk.data_gaps) ? disk.data_gaps : [];
+
+  const sourceBadge = document.getElementById('disk-data-source-badge');
+  if (sourceBadge) {
+    sourceBadge.textContent = source.label;
+    sourceBadge.title = source.detail;
+    sourceBadge.className = `px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${source.className}`;
+  }
+  const gapBanner = document.getElementById('telemetry-gap-banner');
+  const gapText = document.getElementById('telemetry-gap-text');
+  const gapBadge = document.getElementById('telemetry-source-badge');
+  if (gapBanner && gapText) {
+    if ((source.key === 'unavailable' || gaps.length > 0) && currentMode !== 'storage') {
+      gapBanner.classList.remove('hidden');
+      gapText.textContent = gaps.length > 0
+        ? `${source.detail} · Data tidak tersedia: ${gaps.join(', ')}`
+        : source.detail;
+      if (gapBadge) {
+        gapBadge.textContent = source.label;
+        gapBadge.className = `font-mono font-bold px-2 py-0.5 rounded border border-amber-400/40 bg-amber-500/10 shrink-0`;
+      }
+    } else {
+      gapBanner.classList.add('hidden');
+    }
+  }
 
   // Masking Banner
   const maskingBanner = document.getElementById('masking-banner');
   const maskingText = document.getElementById('masking-text');
-  if (isMasking) {
+  if (isMasking && currentMode !== 'storage') {
     maskingBanner.classList.remove('hidden');
     maskingText.textContent = currentLang === 'en' 
       ? (ha.masking_explanation_en || ha.masking_explanation_id || '')
@@ -672,20 +817,25 @@ function renderActiveDisk() {
   const cdiClaimVal = document.getElementById('cdi-claim-val');
   const badgeCdiCompare = document.getElementById('badge-cdi-compare');
 
-  if (badgePct) badgePct.textContent = `${trueHealth}%`;
+  if (badgePct) badgePct.textContent = trueHealth === null ? 'N/A' : `${trueHealth}%`;
 
   if (badgeCdiCompare) {
-    if (isMasking) {
+    if (reportedHealth === null) {
+      badgeCdiCompare.innerHTML = `<span class="text-zinc-500 dark:text-zinc-400">${currentLang === 'en' ? 'No comparative health source' : 'Tidak ada sumber pembanding'}</span>`;
+    } else if (isMasking) {
       badgeCdiCompare.innerHTML = `${t.standardReaderReport} <span id="cdi-claim-val" class="text-zinc-900 dark:text-zinc-100 font-mono font-bold">${reportedHealth}%</span> <span class="text-rose-600 font-bold">${t.lockedStatus}</span>`;
     } else {
       badgeCdiCompare.innerHTML = `${t.standardReaderReport} <span id="cdi-claim-val" class="text-zinc-900 dark:text-zinc-100 font-mono font-bold">${reportedHealth}%</span> <span class="text-emerald-600 font-bold">${t.accurateStatus}</span>`;
     }
   } else if (cdiClaimVal) {
-    cdiClaimVal.textContent = `${reportedHealth}%`;
+    cdiClaimVal.textContent = reportedHealth === null ? 'N/A' : `${reportedHealth}%`;
   }
 
   badgeHealth.className = 'w-44 py-2.5 px-3 rounded-lg flex flex-col items-center justify-center text-center select-none shadow-xs border transition-all';
-  if (trueHealth < 60) {
+  if (trueHealth === null) {
+    badgeHealth.classList.add('bg-zinc-100', 'dark:bg-zinc-800', 'border-zinc-300', 'dark:border-zinc-700', 'text-zinc-700', 'dark:text-zinc-200');
+    badgeLabel.textContent = currentLang === 'en' ? 'Unknown' : 'Tidak Diketahui';
+  } else if (trueHealth < 60) {
     badgeHealth.classList.add('health-badge-bad', 'border-rose-600');
     badgeLabel.textContent = t.statusBad;
   } else if (trueHealth < 90 || isMasking) {
@@ -696,25 +846,34 @@ function renderActiveDisk() {
     badgeLabel.textContent = t.statusGood;
   }
 
-  // Suhu Operasional
-  const temp = disk.temperature_c || 40;
-  document.getElementById('badge-temp').textContent = `${temp} °C`;
+  // Suhu Operasional (tidak mengarang nilai bila sensor tidak tersedia)
+  const temp = disk.temperature_c !== undefined && disk.temperature_c !== null ? Number(disk.temperature_c) : null;
+  const tempBadge = document.getElementById('badge-temp');
   const badgeTempDesc = document.getElementById('badge-temp-desc');
-  if (temp < 45) {
-    badgeTempDesc.textContent = t.tempOptimal;
-    badgeTempDesc.className = 'text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1';
-  } else if (temp <= 55) {
-    badgeTempDesc.textContent = t.tempNormal;
-    badgeTempDesc.className = 'text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-1';
-  } else {
-    badgeTempDesc.textContent = t.tempHot;
-    badgeTempDesc.className = 'text-[11px] text-rose-600 dark:text-rose-400 font-bold mt-1 animate-pulse';
+  if (tempBadge) tempBadge.textContent = temp === null ? 'N/A' : `${temp} °C`;
+  if (badgeTempDesc) {
+    const isNvme = String(disk.bus_type || '').toUpperCase() === 'NVME';
+    const optimalLimit = isNvme ? 65 : 45;
+    const warmLimit = isNvme ? 75 : 55;
+    if (temp === null) {
+      badgeTempDesc.textContent = currentLang === 'en' ? 'Temperature sensor unavailable' : 'Sensor suhu tidak tersedia';
+      badgeTempDesc.className = 'text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold mt-1';
+    } else if (temp <= optimalLimit) {
+      badgeTempDesc.textContent = t.tempOptimal;
+      badgeTempDesc.className = 'text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1';
+    } else if (temp <= warmLimit) {
+      badgeTempDesc.textContent = t.tempNormal;
+      badgeTempDesc.className = 'text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-1';
+    } else {
+      badgeTempDesc.textContent = t.tempHot;
+      badgeTempDesc.className = 'text-[11px] text-rose-600 dark:text-rose-400 font-bold mt-1 animate-pulse';
+    }
   }
 
   // Header Drive Hero
   document.getElementById('disk-model-name').textContent = disk.name;
-  document.getElementById('disk-capacity-type').textContent = `${disk.size_gb} GB`;
-  document.getElementById('disk-interface-type').textContent = `${disk.media_type} (${disk.bus_type})`;
+  document.getElementById('disk-capacity-type').textContent = disk.size_gb ? `${disk.size_gb} GB` : 'N/A';
+  document.getElementById('disk-interface-type').textContent = `${disk.media_type || 'N/A'} (${disk.bus_type || 'N/A'})`;
   document.getElementById('disk-drive-letters').textContent = disk.drive_letters_str || '-';
 
   // Hardware Profile & NAND Telemetry
@@ -736,23 +895,33 @@ function renderActiveDisk() {
     if (hwFeatures.some(f => f.tag === 'TRIM')) {
       heroBadgesHtml += `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">TRIM</span>`;
     }
+    if (hw.profile_confidence === 'generic-estimate') {
+      const note = currentLang === 'en' ? (hw.profile_note_en || '') : (hw.profile_note_id || '');
+      heroBadgesHtml += `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700" title="${escapeHtml(note)}">${currentLang === 'en' ? 'ESTIMATED PROFILE' : 'PROFIL ESTIMASI'}</span>`;
+    }
     heroBadgesContainer.innerHTML = heroBadgesHtml;
   }
 
   // Jam Operasional
-  const poh = disk.power_on_hours || 0;
-  const years = (poh / 8760).toFixed(1);
-  document.getElementById('disk-power-years').textContent = t.yearsOn.replace('{0}', years);
-  document.getElementById('disk-poh-text').textContent = t.pohText.replace('{0}', poh.toLocaleString());
+  const poh = disk.power_on_hours !== undefined && disk.power_on_hours !== null ? Number(disk.power_on_hours) : null;
+  const powYearsEl = document.getElementById('disk-power-years');
+  const pohTextEl = document.getElementById('disk-poh-text');
+  if (poh === null) {
+    if (powYearsEl) powYearsEl.textContent = currentLang === 'en' ? 'Power-on time unavailable' : 'Jam terbang tidak tersedia';
+    if (pohTextEl) pohTextEl.textContent = t.pohText.replace('{0}', 'N/A');
+  } else {
+    if (powYearsEl) powYearsEl.textContent = t.yearsOn.replace('{0}', (poh / 8760).toFixed(1));
+    if (pohTextEl) pohTextEl.textContent = t.pohText.replace('{0}', poh.toLocaleString());
+  }
 
   // Spesifikasi Teknis
-  document.getElementById('spec-firmware').textContent = disk.firmware || '-';
-  document.getElementById('spec-serial').textContent = disk.serial_number || '-';
+  document.getElementById('spec-firmware').textContent = disk.firmware || 'N/A';
+  document.getElementById('spec-serial').textContent = disk.serial_number || 'N/A';
   const interfaceSpeed = disk.bus_type === 'NVMe' ? 'PCIe NVMe' : `${disk.bus_type || 'SATA'} 6.0 Gb/s`;
   document.getElementById('spec-interface').textContent = interfaceSpeed;
 
   const specNandElem = document.getElementById('spec-nand-type');
-  if (specNandElem) specNandElem.textContent = hw.cell_tech_name || (disk.media_type === 'SSD' ? '3D Flash' : 'Piringan Magnetik');
+  if (specNandElem) specNandElem.textContent = hw.cell_tech_name || 'N/A';
 
   const specCacheElem = document.getElementById('spec-cache-type');
   if (specCacheElem) {
@@ -760,10 +929,17 @@ function renderActiveDisk() {
     specCacheElem.textContent = cacheSummary;
   }
 
-  document.getElementById('spec-poc').textContent = disk.power_on_count !== undefined ? t.pocText.replace('{0}', disk.power_on_count.toLocaleString()) : '-';
+  document.getElementById('spec-poc').textContent =
+    disk.power_on_count !== undefined && disk.power_on_count !== null
+      ? t.pocText.replace('{0}', Number(disk.power_on_count).toLocaleString())
+      : 'N/A';
 
-  const hostWritesTb = metrics.host_writes_tb !== undefined ? `${metrics.host_writes_tb} TB` : '-';
-  const hostReadsTb = metrics.host_reads_tb !== undefined ? `${metrics.host_reads_tb} TB` : '-';
+  const hostWritesTb = metrics.host_writes_tb !== undefined && metrics.host_writes_tb !== null
+    ? `${metrics.host_writes_tb} TB`
+    : 'N/A';
+  const hostReadsTb = metrics.host_reads_tb !== undefined && metrics.host_reads_tb !== null
+    ? `${metrics.host_reads_tb} TB`
+    : 'N/A';
   document.getElementById('spec-reads').textContent = hostReadsTb;
   document.getElementById('spec-writes').textContent = hostWritesTb;
 
@@ -779,12 +955,12 @@ function renderActiveDisk() {
   if (elHwCacheSub) elHwCacheSub.textContent = hw.controller_family || '-';
 
   const elHwSlc = document.getElementById('hw-slc-type');
-  if (elHwSlc) elHwSlc.textContent = hw.slc_cache_type || (disk.media_type === 'SSD' ? 'Dynamic SLC Cache' : 'Track Buffer');
+  if (elHwSlc) elHwSlc.textContent = hw.slc_cache_type || 'N/A';
   const elHwSlcSub = document.getElementById('hw-slc-sub');
-  if (elHwSlcSub) elHwSlcSub.textContent = hw.interface_standard || (disk.bus_type || 'SATA III');
+  if (elHwSlcSub) elHwSlcSub.textContent = hw.interface_standard || 'N/A';
 
   const elHwPe = document.getElementById('hw-pe-cycles');
-  if (elHwPe) elHwPe.textContent = hw.durability_pe_cycles || '~1.500 P/E Cycles';
+  if (elHwPe) elHwPe.textContent = hw.durability_pe_cycles || 'N/A';
   const elHwPeSub = document.getElementById('hw-pe-sub');
   if (elHwPeSub) elHwPeSub.textContent = currentLang === 'en' ? 'Rated write endurance' : 'Batas ketahanan hapus-tulis';
 
@@ -841,15 +1017,20 @@ function renderActiveDisk() {
     totalFreeGb += (v.free_gb || 0);
   });
 
-  const usedPct = totalCapGb > 0 ? Math.round((totalUsedGb / totalCapGb) * 100) : 75;
-  document.getElementById('capacity-text').textContent = `${totalUsedGb.toFixed(1)} / ${totalCapGb.toFixed(1)} GB`;
-  document.getElementById('capacity-pct').textContent = `${usedPct}%`;
+  const usedPct = totalCapGb > 0 ? Math.round((totalUsedGb / totalCapGb) * 100) : null;
+  document.getElementById('capacity-text').textContent =
+    totalCapGb > 0 ? `${totalUsedGb.toFixed(1)} / ${totalCapGb.toFixed(1)} GB` : 'N/A';
+  document.getElementById('capacity-pct').textContent = usedPct === null ? 'N/A' : `${usedPct}%`;
 
   const capBar = document.getElementById('capacity-bar');
-  capBar.style.width = `${Math.min(100, usedPct)}%`;
+  capBar.style.width = usedPct === null ? '0%' : `${Math.min(100, usedPct)}%`;
 
   const capWarn = document.getElementById('capacity-warning');
-  if (usedPct >= 85) {
+  if (usedPct === null) {
+    capBar.className = 'bg-zinc-400 h-2 rounded-full transition-all duration-300';
+    capWarn.textContent = currentLang === 'en' ? 'Volume mapping unavailable' : 'Pemetaan volume tidak tersedia';
+    capWarn.className = 'text-zinc-500 dark:text-zinc-400 font-medium';
+  } else if (usedPct >= 85) {
     capBar.className = 'bg-rose-500 h-2 rounded-full transition-all duration-300';
     capWarn.textContent = t.capacityCritical;
     capWarn.className = 'text-rose-600 font-bold';
@@ -865,12 +1046,23 @@ function renderActiveDisk() {
 
   const tooltipText = document.getElementById('capacity-tooltip-text');
   if (tooltipText) {
-    tooltipText.textContent = t.capacityTooltip.replace('{0}', totalUsedGb.toFixed(1)).replace('{1}', totalFreeGb.toFixed(1));
+    tooltipText.textContent = totalCapGb > 0
+      ? t.capacityTooltip.replace('{0}', totalUsedGb.toFixed(1)).replace('{1}', totalFreeGb.toFixed(1))
+      : (currentLang === 'en' ? 'Partition mapping unavailable' : 'Pemetaan partisi tidak tersedia');
+  }
+
+  const wafEl = document.getElementById('waf-multiplier');
+  if (wafEl) {
+    wafEl.textContent = metrics.waf !== undefined && metrics.waf !== null
+      ? `Write Amplification: ${metrics.waf}x`
+      : 'Write Amplification: N/A';
   }
 
   // Status Bar
   document.getElementById('status-active-disk').textContent = t.statusActivePrefix.replace('{0}', disk.device_id).replace('{1}', disk.name).replace('{2}', disk.drive_letters_str);
   document.getElementById('status-timestamp').textContent = t.timestampPrefix.replace('{0}', new Date().toLocaleTimeString());
+  const telemetrySourceEl = document.getElementById('status-telemetry-source');
+  if (telemetrySourceEl) telemetrySourceEl.textContent = `${currentLang === 'en' ? 'Source' : 'Sumber'}: ${source.detail}`;
 
   // Render Subviews
   renderLaymanView(ha, disk);
@@ -913,9 +1105,9 @@ function renderLaymanView(ha, disk) {
         <div class="${cardBg} rounded-md p-3 border border-zinc-200/80 dark:border-zinc-800 space-y-1">
           <div class="flex items-center gap-2 ${iconColor} text-xs font-bold">
             <i data-lucide="${icon}" class="w-3.5 h-3.5 shrink-0"></i>
-            <span class="text-zinc-900 dark:text-zinc-100">${title}</span>
+            <span class="text-zinc-900 dark:text-zinc-100">${escapeHtml(title)}</span>
           </div>
-          <p class="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">${desc}</p>
+          <p class="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">${escapeHtml(desc)}</p>
         </div>
       `;
     }).join('');
@@ -974,7 +1166,7 @@ function renderTechView(ha, disk) {
     pointsContainer.innerHTML = points.map(p => `
       <div class="flex items-start gap-2 py-0.5 border-b border-zinc-100 dark:border-zinc-800/80 last:border-0">
         <span class="text-blue-600 dark:text-blue-400 select-none font-bold">❯</span>
-        <span>${p}</span>
+        <span>${escapeHtml(p)}</span>
       </div>
     `).join('');
   }
@@ -1001,17 +1193,20 @@ function renderSmartTableRows(attributes) {
 
   tbody.innerHTML = attributes.map(a => {
     let sphereClass = 'status-sphere-blue';
-    const thresh = a.threshold !== undefined ? a.threshold : 0;
-    const cur = a.current !== undefined ? a.current : 100;
+    const thresh = a.threshold !== undefined && a.threshold !== null ? Number(a.threshold) : 0;
+    const cur = a.current !== undefined && a.current !== null ? Number(a.current) : null;
+    const rawInt = a.raw_int !== undefined && a.raw_int !== null ? Number(a.raw_int) : null;
 
-    if (thresh > 0 && cur <= thresh) {
+    if (thresh > 0 && cur !== null && cur <= thresh) {
       sphereClass = 'status-sphere-rose';
-    } else if (a.id === 0x05 && a.raw_int > 0) {
+    } else if (a.id === 0x05 && rawInt > 0) {
       sphereClass = 'status-sphere-amber';
-    } else if (a.id === 0xA6 && a.raw_int > 0) {
+    } else if (a.id === 0xA6 && rawInt > 0) {
       sphereClass = 'status-sphere-amber';
-    } else if ((a.id === 0x0E || a.id === 0xBB) && a.raw_int > 0) {
+    } else if ((a.id === 0x0E || a.id === 0xBB) && rawInt > 0) {
       sphereClass = 'status-sphere-rose';
+    } else if (cur === null) {
+      sphereClass = 'status-sphere-gray';
     }
 
     const desc = currentLang === 'en' ? (a.desc_en || a.desc_id || '') : (a.desc_id || a.desc || '');
@@ -1022,17 +1217,17 @@ function renderSmartTableRows(attributes) {
         <td class="py-2 px-2.5 text-center">
           <span class="${sphereClass}"></span>
         </td>
-        <td class="py-2 px-2 text-zinc-500 dark:text-zinc-400 font-mono">${a.id_hex || `0x${a.id.toString(16).toUpperCase().padStart(2, '0')}`}</td>
+        <td class="py-2 px-2 text-zinc-500 dark:text-zinc-400 font-mono">${escapeHtml(a.id_hex || `0x${a.id.toString(16).toUpperCase().padStart(2, '0')}`)}</td>
         <td class="py-2 px-3">
-          <div class="font-sans font-bold text-zinc-900 dark:text-zinc-100">${a.name}</div>
-          <div class="font-sans text-[11px] text-zinc-400 dark:text-zinc-500 leading-tight">${desc}</div>
+          <div class="font-sans font-bold text-zinc-900 dark:text-zinc-100">${escapeHtml(a.name)}</div>
+          <div class="font-sans text-[11px] text-zinc-400 dark:text-zinc-500 leading-tight">${escapeHtml(desc)}</div>
         </td>
-        <td class="py-2 px-2 text-center text-zinc-700 dark:text-zinc-300 font-mono tabular-nums">${a.current !== undefined ? a.current : '--'}</td>
-        <td class="py-2 px-2 text-center text-zinc-700 dark:text-zinc-300 font-mono tabular-nums">${a.worst !== undefined ? a.worst : '--'}</td>
+        <td class="py-2 px-2 text-center text-zinc-700 dark:text-zinc-300 font-mono tabular-nums">${cur === null ? '--' : cur}</td>
+        <td class="py-2 px-2 text-center text-zinc-700 dark:text-zinc-300 font-mono tabular-nums">${a.worst !== undefined && a.worst !== null ? a.worst : '--'}</td>
         <td class="py-2 px-2 text-center text-zinc-500 dark:text-zinc-400 font-mono tabular-nums">${threshDisplay}</td>
         <td class="py-2 px-3 text-right text-zinc-800 dark:text-zinc-200 font-mono tabular-nums">
-          <span class="font-bold text-blue-600 dark:text-blue-400">${a.raw_hex || '0x00'}</span>
-          <span class="text-[10px] text-zinc-400 block">${(a.raw_int !== undefined ? a.raw_int.toLocaleString() : '')}</span>
+          <span class="font-bold text-blue-600 dark:text-blue-400">${escapeHtml(a.raw_hex || 'N/A')}</span>
+          <span class="text-[10px] text-zinc-400 block">${rawInt === null ? 'N/A' : rawInt.toLocaleString()}</span>
         </td>
       </tr>
     `;
@@ -1182,7 +1377,7 @@ async function executeScanStep() {
 
   try {
     const url = `/api/scan_chunk?disk_index=${diskIndex}&start_block=${currentScanBlock}&count=${chunkSize}&total_blocks=${TOTAL_SCAN_BLOCKS}&disk_size=${diskSize}`;
-    const resp = await fetch(url);
+    const resp = await apiFetch(url);
     if (!resp.ok) throw new Error(`HTTP error ${resp.status}`);
     const data = await resp.json();
 
@@ -1274,7 +1469,7 @@ async function runChkdskAction() {
   appendTerminalLog(`[CHKDSK] Menjalankan pemeriksaan struktur cluster & sistem file pada Drive ${drive}: ...`);
 
   try {
-    const resp = await fetch('/api/repair_chkdsk', {
+    const resp = await apiFetch('/api/repair_chkdsk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ drive })
@@ -1302,7 +1497,7 @@ async function runTrimAction() {
   appendTerminalLog(`[TRIM] Mengirim instruksi deallokasi sel flash (ReTrim) ke controller disk ${drive}: ...`);
 
   try {
-    const resp = await fetch('/api/repair_trim', {
+    const resp = await apiFetch('/api/repair_trim', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ drive })
@@ -1330,7 +1525,7 @@ async function runDirtyCheckAction() {
   appendTerminalLog(`[DIRTY BIT] Memeriksa status integritas volume ${drive}: ...`);
 
   try {
-    const resp = await fetch(`/api/dirty_check?drive=${drive}`);
+    const resp = await apiFetch(`/api/dirty_check?drive=${drive}`);
     const data = await resp.json();
     if (data.success) {
       const statusDirty = data.is_dirty ? 'PERINGATAN: Partisi kotor (Dirty Bit aktif)! Diperlukan chkdsk /f.' : 'STATUS BERSIH: Partisi sehat dan tersinkronisasi sempurna.';
@@ -1429,12 +1624,15 @@ function formatAgeDays(days) {
 async function initStorageView() {
   await loadStorageDrives();
   await checkStorageScanStatus();
+  if (!storageResults) {
+    renderStorageResults({});
+  }
 }
 
 // 2. Load available drives
 async function loadStorageDrives() {
   try {
-    const res = await fetch('/api/storage/drives');
+    const res = await apiFetch('/api/storage/drives');
     const data = await res.json();
     if (data.success && data.drives) {
       storageDrives = data.drives;
@@ -1575,9 +1773,17 @@ function updateDriveUsageHero() {
   let totalBytes = 0;
   let usedBytes = 0;
   let freeBytes = 0;
+  const breakdown = storageResults && storageResults.breakdown;
 
-  if (selectedStorageDrive === 'all') {
-    if (labelElem) labelElem.textContent = 'Semua Disk Tergabung';
+  if (breakdown && breakdown.total_size) {
+    // Align the hero with the drives that were actually scanned.
+    totalBytes = breakdown.total_size;
+    usedBytes = breakdown.total_used;
+    freeBytes = breakdown.total_free;
+    const scanned = (storageResults.drives_scanned || []).join(', ');
+    if (labelElem) labelElem.textContent = scanned ? `Scanned: ${scanned}` : txt('Scan results', 'Hasil pemindaian');
+  } else if (selectedStorageDrive === 'all') {
+    if (labelElem) labelElem.textContent = txt('All drives combined', 'Semua disk tergabung');
     storageDrives.forEach((d) => {
       totalBytes += d.total || 0;
       usedBytes += d.used || 0;
@@ -1586,7 +1792,7 @@ function updateDriveUsageHero() {
   } else {
     const d = storageDrives.find((drv) => drv.drive.toUpperCase() === selectedStorageDrive.toUpperCase());
     if (d) {
-      if (labelElem) labelElem.textContent = `Drive ${d.drive} (${d.fstype || 'NTFS'})`;
+      if (labelElem) labelElem.textContent = `Drive ${d.drive}`;
       totalBytes = d.total || 0;
       usedBytes = d.used || 0;
       freeBytes = d.free || 0;
@@ -1594,18 +1800,17 @@ function updateDriveUsageHero() {
   }
 
   const percentUsed = totalBytes > 0 ? ((usedBytes / totalBytes) * 100).toFixed(1) : 0;
-  if (freeSummary) freeSummary.textContent = `Tersedia ${formatStorageBytes(freeBytes)}`;
-  if (usedSummary) usedSummary.textContent = `Terpakai ${formatStorageBytes(usedBytes)} / ${formatStorageBytes(totalBytes)} (${percentUsed}%)`;
+  if (freeSummary) freeSummary.textContent = `${txt('Free', 'Tersedia')} ${formatStorageBytes(freeBytes)}`;
+  if (usedSummary) usedSummary.textContent = `${txt('Used', 'Terpakai')} ${formatStorageBytes(usedBytes)} / ${formatStorageBytes(totalBytes)} (${percentUsed}%)`;
 
-  // Segmented bar breakdown
-  if (storageResults && storageResults.breakdown) {
-    const b = storageResults.breakdown;
-    const total = totalBytes > 0 ? totalBytes : (b.total_used || 1);
+  // Segmented bar breakdown: measured bytes only, no proportional fabrication.
+  if (breakdown && breakdown.measured_bytes !== undefined) {
+    const total = totalBytes > 0 ? totalBytes : (breakdown.total_used || 1);
 
-    const pUser = Math.min(100, (b.user_files / total) * 100);
-    const pApp = Math.min(100, (b.app_files / total) * 100);
-    const pSys = Math.min(100, (b.system_files / total) * 100);
-    const pRecycle = Math.min(100, (b.recycle_bin / total) * 100);
+    const pUser = Math.min(100, (breakdown.user_files / total) * 100);
+    const pApp = Math.min(100, (breakdown.app_files / total) * 100);
+    const pSys = Math.min(100, (breakdown.system_files / total) * 100);
+    const pRecycle = Math.min(100, (breakdown.recycle_bin / total) * 100);
     const pOther = Math.max(0, 100 - (pUser + pApp + pSys + pRecycle));
 
     setSegmentWidth('seg-user', pUser);
@@ -1614,25 +1819,22 @@ function updateDriveUsageHero() {
     setSegmentWidth('seg-recycle', pRecycle);
     setSegmentWidth('seg-other', pOther);
 
-    setElementText('val-seg-user', formatStorageBytes(b.user_files));
-    setElementText('val-seg-app', formatStorageBytes(b.app_files));
-    setElementText('val-seg-system', formatStorageBytes(b.system_files));
-    setElementText('val-seg-recycle', formatStorageBytes(b.recycle_bin));
-    setElementText('val-seg-other', formatStorageBytes(b.other));
-  } else {
-    // Proportional visual representation based on used space
-    const pUsed = parseFloat(percentUsed) || 0;
-    setSegmentWidth('seg-user', pUsed * 0.45);
-    setSegmentWidth('seg-app', pUsed * 0.30);
-    setSegmentWidth('seg-system', pUsed * 0.15);
-    setSegmentWidth('seg-recycle', pUsed * 0.02);
-    setSegmentWidth('seg-other', pUsed * 0.08);
+    setElementText('val-seg-user', formatStorageBytes(breakdown.user_files));
+    setElementText('val-seg-app', formatStorageBytes(breakdown.app_files));
+    setElementText('val-seg-system', formatStorageBytes(breakdown.system_files));
+    setElementText('val-seg-recycle', formatStorageBytes(breakdown.recycle_bin));
+    setElementText('val-seg-other', formatStorageBytes(breakdown.other));
 
-    setElementText('val-seg-user', formatStorageBytes(usedBytes * 0.45));
-    setElementText('val-seg-app', formatStorageBytes(usedBytes * 0.30));
-    setElementText('val-seg-system', formatStorageBytes(usedBytes * 0.15));
-    setElementText('val-seg-recycle', formatStorageBytes(usedBytes * 0.02));
-    setElementText('val-seg-other', formatStorageBytes(usedBytes * 0.08));
+    if (usedSummary) {
+      usedSummary.textContent = `${txt('Used', 'Terpakai')} ${formatStorageBytes(usedBytes)} / ${formatStorageBytes(totalBytes)} (${percentUsed}%) · ${txt('measured', 'terukur')} ${breakdown.coverage_pct}%`;
+    }
+  } else {
+    setSegmentWidth('seg-user', 0);
+    setSegmentWidth('seg-app', 0);
+    setSegmentWidth('seg-system', 0);
+    setSegmentWidth('seg-recycle', 0);
+    setSegmentWidth('seg-other', 0);
+    ['val-seg-user', 'val-seg-app', 'val-seg-system', 'val-seg-recycle', 'val-seg-other'].forEach((id) => setElementText(id, '—'));
   }
 }
 
@@ -1649,7 +1851,7 @@ function setElementText(id, text) {
 // 3. Check scan status on page load or tab switch
 async function checkStorageScanStatus() {
   try {
-    const res = await fetch('/api/storage/scan_status');
+    const res = await apiFetch('/api/storage/scan_status');
     const status = await res.json();
     if (status.is_scanning) {
       showStorageProgress(true);
@@ -1673,7 +1875,7 @@ async function triggerStorageScan() {
   if (txtScan) txtScan.textContent = 'Menyiapkan Pindai...';
 
   try {
-    const res = await fetch('/api/storage/start_scan', {
+    const res = await apiFetch('/api/storage/start_scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ drive: drive, drives: [drive] })
@@ -1683,10 +1885,10 @@ async function triggerStorageScan() {
       showStorageProgress(true);
       startStoragePolling();
     } else {
-      alert(`Gagal memulai pemindaian: ${data.message || data.error}`);
+      showToast(`Gagal memulai pemindaian: ${data.message || data.error}`, 'error');
     }
   } catch (err) {
-    alert(`Terjadi kesalahan jaringan: ${err.message}`);
+    showToast(`Terjadi kesalahan jaringan: ${err.message}`, 'error');
   } finally {
     if (btnScan) btnScan.disabled = false;
   }
@@ -1697,7 +1899,7 @@ async function cancelStorageScan() {
   try {
     const btnCancel = document.getElementById('btn-storage-cancel');
     if (btnCancel) btnCancel.disabled = true;
-    await fetch('/api/storage/cancel_scan', { method: 'POST' });
+    await apiFetch('/api/storage/cancel_scan', { method: 'POST' });
     const statusElem = document.getElementById('storage-progress-status');
     if (statusElem) statusElem.textContent = 'Membatalkan pemindaian...';
   } catch (err) {
@@ -1723,7 +1925,7 @@ function startStoragePolling() {
 
   storageScanPollTimer = setInterval(async () => {
     try {
-      const res = await fetch('/api/storage/scan_status');
+      const res = await apiFetch('/api/storage/scan_status');
       const st = await res.json();
 
       updateStorageProgressBar(st);
@@ -1781,7 +1983,7 @@ function showStorageProgress(show) {
 // 7. Load and Render Results
 async function loadStorageResults() {
   try {
-    const res = await fetch('/api/storage/results');
+    const res = await apiFetch('/api/storage/results');
     const data = await res.json();
     if (data.status === 'ok') {
       storageResults = data;
@@ -1800,10 +2002,10 @@ function renderStorageResults(data) {
   const countOld = data.old_items ? data.old_items.length : 0;
   const countDup = data.duplicate_groups ? data.duplicate_groups.length : 0;
 
-  setElementText('badge-count-recommend', countRec);
-  setElementText('badge-count-large', countLarge);
-  setElementText('badge-count-old', countOld);
-  setElementText('badge-count-dup', countDup);
+  setElementText('badge-recommend-count', countRec);
+  setElementText('badge-large-count', countLarge);
+  setElementText('badge-old-count', countOld);
+  setElementText('badge-dup-count', countDup);
 
   // Render tabs
   renderRecommendationsSubTab();
@@ -1818,7 +2020,7 @@ function setStorageSubTab(tab) {
   const tabs = ['recommend', 'large', 'old', 'dup'];
 
   tabs.forEach((t) => {
-    const btn = document.getElementById(`btn-subtab-${t}`);
+    const btn = document.getElementById(`btn-sub-${t}`);
     const view = document.getElementById(`subview-${t}`);
 
     const isActive = t === tab;
@@ -1842,45 +2044,67 @@ function renderRecommendationsSubTab() {
   const container = document.getElementById('recommendations-container');
   if (!container) return;
 
-  const items = (storageResults && storageResults.recommendations) || [];
+  if (!storageResults) {
+    container.innerHTML = `
+      <div class="app-surface p-8 text-center space-y-2">
+        <i data-lucide="hard-drive-download" class="w-8 h-8 text-zinc-400 mx-auto"></i>
+        <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">${currentLang === 'en' ? 'No scan has run yet' : 'Belum ada pemindaian'}</h4>
+        <p class="text-xs text-zinc-500">${currentLang === 'en' ? 'Choose a target drive and start a scan to see cleanup recommendations.' : 'Pilih target disk lalu mulai pemindaian untuk melihat rekomendasi pembersihan.'}</p>
+      </div>`;
+    safeCreateIcons();
+    selectedRecommendationIndices.clear();
+    updateRecommendationSummary();
+    return;
+  }
+
+  const items = storageResults.recommendations || [];
   if (items.length === 0) {
     container.innerHTML = `
       <div class="app-surface p-8 text-center space-y-2">
         <i data-lucide="check-circle-2" class="w-8 h-8 text-emerald-500 mx-auto"></i>
         <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">Sistem Bersih dan Rapi</h4>
-        <p class="text-xs text-zinc-500">Tidak ada penumpukan cache atau berkas sampah yang mendesak untuk dibersihkan.</p>
+        <p class="text-xs text-zinc-500">Tidak ada penumpukan cache atau berkas sampah di atas 1 MB yang terdeteksi pada target ini.</p>
       </div>`;
     safeCreateIcons();
+    selectedRecommendationIndices.clear();
     updateRecommendationSummary();
     return;
   }
 
-  // Pre-select all safe recommendations by default
+  // Pre-select only items the backend marked as default-safe and selectable.
   selectedRecommendationIndices.clear();
   items.forEach((item, idx) => {
-    if (item.safe_to_delete) selectedRecommendationIndices.add(idx);
+    if (item.selectable !== false && item.default_checked) selectedRecommendationIndices.add(idx);
   });
 
   let html = '';
   items.forEach((item, idx) => {
     const isChecked = selectedRecommendationIndices.has(idx);
     const sizeStr = formatStorageBytes(item.size);
-    const isFolder = item.is_dir !== false;
+    const isFolder = item.is_dir === true;
+    const selectable = item.selectable !== false;
+    const safeLabel = selectable
+      ? (item.safe_level === 'medium'
+        ? (currentLang === 'en' ? 'Rebuildable cache' : 'Cache dapat dibangun ulang')
+        : (currentLang === 'en' ? 'Safe to delete' : 'Aman dihapus'))
+      : (currentLang === 'en' ? 'Manual inspection only' : 'Inspeksi manual');
+    const safeClass = selectable
+      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+      : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-600';
+    const pathArg = jsPathArg(item.path);
 
     html += `
       <div class="storage-card overflow-hidden transition-all duration-200 border border-zinc-200 dark:border-zinc-800 rounded-lg ${isChecked ? 'ring-1 ring-emerald-500/30 bg-emerald-500/5' : ''}" id="rec-card-${idx}">
-        <!-- Main Card Header Row (Clickable to Expand if Folder) -->
-        <div class="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isFolder ? 'cursor-pointer select-none hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors' : ''}" onclick="${isFolder ? `toggleRecommendationFolderExpand(${idx}, '${escapePath(item.path)}')` : ''}">
+        <div class="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isFolder ? 'cursor-pointer select-none hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors' : ''}" onclick="${isFolder ? `toggleRecommendationFolderExpand(${idx}, decodeURIComponent('${pathArg}'))` : ''}">
           <div class="flex items-start gap-3 flex-1 min-w-0">
-            <!-- Checkbox with stopPropagation so checking it doesn't expand/collapse -->
-            <input type="checkbox" id="chk-rec-${idx}" onclick="event.stopPropagation()" onchange="toggleRecommendation(${idx})" class="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-600 cursor-pointer shrink-0" ${isChecked ? 'checked' : ''}>
+            <input type="checkbox" id="chk-rec-${idx}" onclick="event.stopPropagation()" onchange="toggleRecommendation(${idx})" ${selectable ? '' : 'disabled'} class="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-600 cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed" ${isChecked ? 'checked' : ''}>
             <div class="space-y-0.5 flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">${escapeHtml(item.category)}</span>
-                <span class="badge-tag bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Aman Dihapus</span>
-                ${isFolder ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700/60 shadow-xs"><i data-lucide="chevron-right" id="rec-chevron-${idx}" class="w-3 h-3 transition-transform duration-200 text-zinc-400"></i><span id="rec-expand-lbl-${idx}">Klik untuk lihat isi</span></span>` : ''}
+                <span class="badge-tag ${safeClass}">${safeLabel}</span>
+                ${isFolder ? `<span class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700/60 shadow-xs"><i data-lucide="chevron-right" id="rec-chevron-${idx}" class="w-3 h-3 transition-transform duration-200 text-zinc-400"></i><span id="rec-expand-lbl-${idx}">${currentLang === 'en' ? 'Inspect contents' : 'Lihat isi'}</span></span>` : ''}
               </div>
-              <p class="text-[11px] text-zinc-500 dark:text-zinc-400">${escapeHtml(item.description)}</p>
+              <p class="text-[11px] text-zinc-500 dark:text-zinc-400">${escapeHtml(currentLang === 'en' ? (item.desc_en || item.description || item.desc || '') : (item.description || item.desc || ''))}</p>
               <div class="text-[10px] font-mono text-zinc-400 truncate max-w-md">${escapeHtml(item.path)}</div>
             </div>
           </div>
@@ -1888,21 +2112,18 @@ function renderRecommendationsSubTab() {
           <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-200 dark:border-zinc-800" onclick="event.stopPropagation()">
             <div class="text-right">
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">${sizeStr}</div>
-              <div class="text-[10px] text-zinc-400">Potensi Hemat</div>
+              <div class="text-[10px] text-zinc-400">${selectable ? txt('Potential savings', 'Potensi hemat') : txt('Info only', 'Hanya informasi')}</div>
             </div>
-            <button onclick="openInExplorer('${escapePath(item.path)}')" class="btn-icon-action px-2.5 py-1.5 rounded text-xs flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-all shadow-xs" title="Buka di File Explorer">
+            <button onclick="openInExplorer(decodeURIComponent('${pathArg}'))" class="btn-icon-action px-2.5 py-1.5 rounded text-xs flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-all shadow-xs" title="Buka di File Explorer">
               <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
-              <span>Buka</span>
+              <span>${txt('Open', 'Buka')}</span>
             </button>
           </div>
         </div>
 
-        <!-- Accordion Child Panel (Loaded via /api/storage/inspect_folder) -->
         ${isFolder ? `
         <div id="rec-expand-panel-${idx}" class="hidden border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/70 p-3">
-          <div id="rec-expand-content-${idx}" class="text-xs text-zinc-500 font-mono">
-            <!-- Dynamically populated -->
-          </div>
+          <div id="rec-expand-content-${idx}" class="text-xs text-zinc-500 font-mono"></div>
         </div>` : ''}
       </div>`;
   });
@@ -1913,6 +2134,8 @@ function renderRecommendationsSubTab() {
 }
 
 function toggleRecommendation(idx) {
+  const item = (storageResults && storageResults.recommendations || [])[idx];
+  if (!item || item.selectable === false) return;
   if (selectedRecommendationIndices.has(idx)) {
     selectedRecommendationIndices.delete(idx);
   } else {
@@ -1935,16 +2158,28 @@ function updateRecommendationSummary() {
   });
 
   const summaryElem = document.getElementById('txt-recommendations-summary');
-  const btnClean = document.getElementById('btn-clean-recommendations');
+  const totalElem = document.getElementById('rec-total-cleanable');
+  const btnClean = document.getElementById('btn-clean-recommended');
+  const btnText = document.getElementById('txt-btn-clean-rec');
   const count = selectedRecommendationIndices.size;
 
+  if (totalElem) totalElem.textContent = formatStorageBytes(totalReclaimable);
   if (summaryElem) {
-    summaryElem.textContent = `${count} dari ${items.length} item terpilih · Total potensi ruang bebas: ${formatStorageBytes(totalReclaimable)}`;
+    summaryElem.textContent = storageResults
+      ? txt(
+          `${count} of ${items.length} selected · Potential free space: ${formatStorageBytes(totalReclaimable)}`,
+          `${count} dari ${items.length} item terpilih · Potensi ruang bebas: ${formatStorageBytes(totalReclaimable)}`
+        )
+      : txt('No scan has run in this session.', 'Belum ada pemindaian pada sesi ini.');
   }
   if (btnClean) {
     btnClean.disabled = count === 0;
-    btnClean.innerHTML = `<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Bersihkan ${formatStorageBytes(totalReclaimable)}`;
-    safeCreateIcons();
+    btnClean.classList.toggle('opacity-50', count === 0);
+  }
+  if (btnText) {
+    btnText.textContent = count === 0
+      ? (currentLang === 'en' ? 'Select items' : 'Pilih item')
+      : (currentLang === 'en' ? `Clean ${formatStorageBytes(totalReclaimable)}` : `Bersihkan ${formatStorageBytes(totalReclaimable)}`);
   }
 }
 
@@ -1960,27 +2195,30 @@ async function cleanRecommendedItems() {
   const confirmMsg = `Yakin ingin membersihkan ${pathsToClean.length} direktori/cache terpilih?\n\nItem yang dibersihkan adalah berkas temporer, cache compiler/package, atau crash dumps yang aman dihapus.`;
   if (!confirm(confirmMsg)) return;
 
-  const btnClean = document.getElementById('btn-clean-recommendations');
+  const btnClean = document.getElementById('btn-clean-recommended');
   if (btnClean) btnClean.disabled = true;
 
   try {
-    const res = await fetch('/api/storage/clean', {
+    const res = await apiFetch('/api/storage/clean', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paths: pathsToClean })
     });
     const result = await res.json();
+    const freed = result.freed_formatted || result.reclaimed_formatted || '0 B';
     if (result.success) {
-      alert(`Pembersihan Selesai!\n\nRuang berhasil dibebaskan: ${result.reclaimed_formatted}\nItem terhapus: ${result.deleted_count}`);
+      if (result.rejected && result.rejected.length > 0) {
+        showToast(`Dibersihkan ${freed}. ${result.rejected.length} path ditolak oleh pengaman.`, 'warning', 6000);
+      } else {
+        showToast(`Pembersihan selesai. Ruang dibebaskan: ${freed} (${result.deleted_count} item).`, 'success');
+      }
       await loadStorageDrives();
-      await triggerStorageScan();
+      showToast('Jalankan pemindaian ulang untuk memperbarui angka.', 'info');
     } else {
-      alert(`Pembersihan selesai dengan catatan: ${result.errors && result.errors.length ? result.errors[0] : 'Beberapa berkas mungkin sedang dikunci oleh proses lain.'}`);
-      await loadStorageDrives();
-      await triggerStorageScan();
+      showToast(`Pembersihan gagal: ${result.error || 'Tidak ada path yang diizinkan.'}`, 'error');
     }
   } catch (err) {
-    alert(`Terjadi kesalahan: ${err.message}`);
+    showToast(`Terjadi kesalahan: ${err.message}`, 'error');
   } finally {
     if (btnClean) btnClean.disabled = false;
   }
@@ -2003,20 +2241,31 @@ function filterLargeBySize(minMB) {
   renderLargeItemsSubTab();
 }
 
+function onLargeSizeChange() {
+  const sel = document.getElementById('filter-large-size');
+  if (!sel || sel.value === 'all') {
+    storageLargeFilterMinBytes = 0;
+  } else {
+    const mb = Number(sel.value);
+    storageLargeFilterMinBytes = Number.isFinite(mb) ? mb * 1024 * 1024 : 0;
+  }
+  renderLargeItemsSubTab();
+}
+
 function onLargeSearchInput() {
-  const inp = document.getElementById('large-search-input');
+  const inp = document.getElementById('search-large-input') || document.getElementById('large-search-input');
   storageLargeSearchQuery = (inp ? inp.value : '').toLowerCase().trim();
   renderLargeItemsSubTab();
 }
 
 function onLargeTypeChange() {
-  const sel = document.getElementById('large-type-select');
+  const sel = document.getElementById('filter-large-type') || document.getElementById('large-type-select');
   storageLargeFilterType = sel ? sel.value : 'all';
   renderLargeItemsSubTab();
 }
 
 function onLargeSortChange() {
-  const sel = document.getElementById('large-sort-select');
+  const sel = document.getElementById('sort-large-order') || document.getElementById('large-sort-select');
   storageLargeSortOrder = sel ? sel.value : 'desc';
   renderLargeItemsSubTab();
 }
@@ -2053,8 +2302,21 @@ function renderLargeItemsSubTab() {
   });
 
   if (summaryElem) {
-    let totalBytes = items.reduce((acc, cur) => acc + (cur.size || 0), 0);
-    summaryElem.textContent = `Menampilkan ${items.length} item · Total: ${formatStorageBytes(totalBytes)}`;
+    const totalBytes = items.reduce((acc, cur) => acc + (cur.size || 0), 0);
+    summaryElem.textContent = txt(
+      `Showing ${items.length} items · Total: ${formatStorageBytes(totalBytes)}`,
+      `Menampilkan ${items.length} item · Total: ${formatStorageBytes(totalBytes)}`
+    );
+  }
+
+  if (!storageResults) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="py-8 text-center text-zinc-500 text-xs">
+          Belum ada pemindaian. Pilih target disk lalu klik Mulai Pindai Disk.
+        </td>
+      </tr>`;
+    return;
   }
 
   if (items.length === 0) {
@@ -2069,13 +2331,14 @@ function renderLargeItemsSubTab() {
 
   let html = '';
   items.slice(0, 150).forEach((item, idx) => {
-    const isFolder = item.is_dir;
+    const isFolder = item.is_dir === true;
+    const pathArg = jsPathArg(item.path);
     const typeBadge = isFolder
-      ? `<span class="badge-tag bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 cursor-pointer" onclick="toggleLargeFolderExpand(${idx}, '${escapePath(item.path)}')">Folder ▾</span>`
-      : `<span class="badge-tag bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Berkas</span>`;
+      ? `<span class="badge-tag bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 cursor-pointer">Folder</span>`
+      : `<span class="badge-tag bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">${txt('File', 'Berkas')}</span>`;
 
     html += `
-      <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${isFolder ? 'cursor-pointer' : ''}" onclick="${isFolder ? `toggleLargeFolderExpand(${idx}, '${escapePath(item.path)}')` : ''}">
+      <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${isFolder ? 'cursor-pointer' : ''}" onclick="${isFolder ? `toggleLargeFolderExpand(${idx}, decodeURIComponent('${pathArg}'))` : ''}">
         <td class="py-2 px-3">
           <div class="flex items-center gap-2">
             <i data-lucide="${isFolder ? 'folder' : 'file'}" class="w-3.5 h-3.5 ${isFolder ? 'text-amber-500' : 'text-zinc-400'} shrink-0"></i>
@@ -2091,12 +2354,12 @@ function renderLargeItemsSubTab() {
         <td class="py-2 px-3 text-zinc-500 text-[10px] tabular-nums">${item.mtime_str || '-'}</td>
         <td class="py-2 px-3 text-center" onclick="event.stopPropagation()">
           <div class="flex items-center justify-center gap-1.5">
-            <button onclick="openInExplorer('${escapePath(item.path)}')" class="btn-icon-action p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300" title="Buka di File Explorer">
+            <button onclick="openInExplorer(decodeURIComponent('${pathArg}'))" class="btn-icon-action p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300" title="Buka di File Explorer">
               <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
             </button>
-            <button onclick="deleteSingleItem('${escapePath(item.path)}', '${escapeHtml(item.name)}')" class="btn-icon-action p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400" title="Hapus Berkas Ini">
+            ${isFolder ? '' : `<button onclick="deleteSingleItem(decodeURIComponent('${pathArg}'), '${escapeHtml(item.name).replace(/'/g, '&#039;')}')" class="btn-icon-action p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400" title="Hapus Berkas Ini">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            </button>
+            </button>`}
           </div>
         </td>
       </tr>
@@ -2140,8 +2403,21 @@ function renderOldItemsSubTab() {
   items.sort((a, b) => (b.age_days || 0) - (a.age_days || 0));
 
   if (summaryElem) {
-    let totalBytes = items.reduce((acc, cur) => acc + (cur.size || 0), 0);
-    summaryElem.textContent = `Menampilkan ${items.length} item tidak aktif (> ${storageOldFilterDays} hari) · Total: ${formatStorageBytes(totalBytes)}`;
+    const totalBytes = items.reduce((acc, cur) => acc + (cur.size || 0), 0);
+    summaryElem.textContent = txt(
+      `Showing ${items.length} inactive items (> ${storageOldFilterDays} days) · Total: ${formatStorageBytes(totalBytes)}`,
+      `Menampilkan ${items.length} item tidak aktif (> ${storageOldFilterDays} hari) · Total: ${formatStorageBytes(totalBytes)}`
+    );
+  }
+
+  if (!storageResults) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="py-8 text-center text-zinc-500 text-xs">
+          Belum ada pemindaian. Pilih target disk lalu klik Mulai Pindai Disk.
+        </td>
+      </tr>`;
+    return;
   }
 
   if (items.length === 0) {
@@ -2156,11 +2432,13 @@ function renderOldItemsSubTab() {
 
   let html = '';
   items.slice(0, 150).forEach((item) => {
+    const pathArg = jsPathArg(item.path);
+    const isFolder = item.is_dir === true;
     html += `
       <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
         <td class="py-2 px-3">
           <div class="flex items-center gap-2">
-            <i data-lucide="${item.is_dir ? 'folder' : 'file'}" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
+            <i data-lucide="${isFolder ? 'folder' : 'file'}" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
             <div class="truncate max-w-sm font-semibold text-zinc-900 dark:text-zinc-100" title="${escapeHtml(item.path)}">
               ${escapeHtml(item.name)}
             </div>
@@ -2171,15 +2449,15 @@ function renderOldItemsSubTab() {
         <td class="py-2 px-3 text-center">
           <span class="badge-tag bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">${formatAgeDays(item.age_days || 0)}</span>
         </td>
-        <td class="py-2 px-3 text-zinc-500 text-[10px] tabular-nums">${item.atime_str || item.mtime_str || '-'}</td>
+        <td class="py-2 px-3 text-zinc-500 text-[10px] tabular-nums">${item.mtime_str || '-'}</td>
         <td class="py-2 px-3 text-center">
           <div class="flex items-center justify-center gap-1.5">
-            <button onclick="openInExplorer('${escapePath(item.path)}')" class="btn-icon-action p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300" title="Buka di File Explorer">
+            <button onclick="openInExplorer(decodeURIComponent('${pathArg}'))" class="btn-icon-action p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300" title="Buka di File Explorer">
               <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
             </button>
-            <button onclick="deleteSingleItem('${escapePath(item.path)}', '${escapeHtml(item.name)}')" class="btn-icon-action p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400" title="Hapus Berkas Ini">
+            ${isFolder ? '' : `<button onclick="deleteSingleItem(decodeURIComponent('${pathArg}'), '${escapeHtml(item.name).replace(/'/g, '&#039;')}')" class="btn-icon-action p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400" title="Hapus Berkas Ini">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            </button>
+            </button>`}
           </div>
         </td>
       </tr>`;
@@ -2194,13 +2472,25 @@ function renderDuplicatesSubTab() {
   const container = document.getElementById('duplicates-container');
   if (!container) return;
 
-  const groups = (storageResults && storageResults.duplicate_groups) || [];
+  if (!storageResults) {
+    container.innerHTML = `
+      <div class="app-surface p-8 text-center space-y-2">
+        <i data-lucide="hard-drive-download" class="w-8 h-8 text-zinc-400 mx-auto"></i>
+        <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">Belum ada pemindaian</h4>
+        <p class="text-xs text-zinc-500">Pemindaian duplikat membutuhkan pembacaan dan hashing berkas pada drive target.</p>
+      </div>`;
+    safeCreateIcons();
+    updateDuplicateDeleteButton();
+    return;
+  }
+
+  const groups = storageResults.duplicate_groups || [];
   if (groups.length === 0) {
     container.innerHTML = `
       <div class="app-surface p-8 text-center space-y-2">
         <i data-lucide="check-check" class="w-8 h-8 text-emerald-500 mx-auto"></i>
         <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">Tidak Ditemukan Berkas Duplikat</h4>
-        <p class="text-xs text-zinc-500">Semua berkas pada target pemindaian bersifat unik.</p>
+        <p class="text-xs text-zinc-500">Tidak ada kelompok berkas identik pada batas pemindaian ini.</p>
       </div>`;
     safeCreateIcons();
     updateDuplicateDeleteButton();
@@ -2232,12 +2522,12 @@ function renderDuplicatesSubTab() {
       html += `
         <div class="flex items-center justify-between gap-2 p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-[11px] font-mono">
           <div class="flex items-center gap-2 truncate max-w-lg">
-            <input type="checkbox" id="chk-dup-${gIdx}-${fIdx}" onchange="toggleDuplicateItem('${escapePath(f.path)}')" class="w-3.5 h-3.5 rounded text-rose-600 focus:ring-rose-500 border-zinc-300 dark:border-zinc-600 cursor-pointer" ${isChecked ? 'checked' : ''}>
+            <input type="checkbox" id="chk-dup-${gIdx}-${fIdx}" onchange="toggleDuplicateItem(decodeURIComponent('${jsPathArg(f.path)}'))" class="w-3.5 h-3.5 rounded text-rose-600 focus:ring-rose-500 border-zinc-300 dark:border-zinc-600 cursor-pointer" ${isChecked ? 'checked' : ''}>
             <span class="truncate text-zinc-700 dark:text-zinc-300" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</span>
           </div>
           <div class="flex items-center gap-3 shrink-0">
             <span class="text-zinc-400 text-[10px]">${f.mtime_str || '-'}</span>
-            <button onclick="openInExplorer('${escapePath(f.path)}')" class="btn-icon-action p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300" title="Buka di File Explorer">
+            <button onclick="openInExplorer(decodeURIComponent('${jsPathArg(f.path)}'))" class="btn-icon-action p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300" title="Buka di File Explorer">
               <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -2296,7 +2586,9 @@ function updateDuplicateDeleteButton() {
   const count = selectedDuplicatePaths.size;
 
   if (btnDelete) btnDelete.disabled = count === 0;
-  if (txtDelete) txtDelete.textContent = `Hapus ${count} Salinan Terpilih`;
+  if (txtDelete) {
+    txtDelete.textContent = txt(`Delete ${count} selected copies`, `Hapus ${count} salinan terpilih`);
+  }
 }
 
 async function deleteSelectedDuplicates() {
@@ -2310,24 +2602,22 @@ async function deleteSelectedDuplicates() {
   if (btnDelete) btnDelete.disabled = true;
 
   try {
-    const res = await fetch('/api/storage/clean', {
+    const res = await apiFetch('/api/storage/clean', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paths })
     });
     const result = await res.json();
     if (result.success) {
-      alert(`Pembersihan Duplikat Selesai!\n\nRuang berhasil dibebaskan: ${result.reclaimed_formatted}\nFile terhapus: ${result.deleted_count}`);
+      showToast(`Duplikat dibersihkan. Ruang dibebaskan: ${result.freed_formatted || result.reclaimed_formatted || '0 B'}.`, 'success');
       selectedDuplicatePaths.clear();
       await loadStorageDrives();
-      await triggerStorageScan();
+      showToast('Jalankan pemindaian ulang untuk memperbarui daftar duplikat.', 'info');
     } else {
-      alert(`Pembersihan selesai dengan catatan: ${result.errors && result.errors.length ? result.errors[0] : 'Beberapa file mungkin sedang dibuka program lain.'}`);
-      await loadStorageDrives();
-      await triggerStorageScan();
+      showToast(`Pembersihan gagal: ${result.error || 'Tidak ada path yang diizinkan.'}`, 'error');
     }
   } catch (err) {
-    alert(`Terjadi kesalahan: ${err.message}`);
+    showToast(`Terjadi kesalahan: ${err.message}`, 'error');
   } finally {
     if (btnDelete) btnDelete.disabled = false;
   }
@@ -2337,17 +2627,17 @@ async function deleteSelectedDuplicates() {
 async function openInExplorer(path) {
   if (!path) return;
   try {
-    const res = await fetch('/api/storage/open_explorer', {
+    const res = await apiFetch('/api/storage/open_explorer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path })
     });
     const data = await res.json();
     if (!data.success) {
-      alert(`Gagal membuka Explorer: ${data.error || 'Jalur berkas tidak ditemukan'}`);
+      showToast(`Gagal membuka Explorer: ${data.error || data.message || 'Jalur tidak ditemukan'}`, 'error');
     }
   } catch (err) {
-    alert(`Kesalahan membuka explorer: ${err.message}`);
+    showToast(`Kesalahan membuka explorer: ${err.message}`, 'error');
   }
 }
 
@@ -2358,21 +2648,20 @@ async function deleteSingleItem(path, name) {
   if (!confirm(confirmMsg)) return;
 
   try {
-    const res = await fetch('/api/storage/clean', {
+    const res = await apiFetch('/api/storage/clean', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paths: [path] })
     });
     const data = await res.json();
     if (data.success) {
-      alert(`Berhasil menghapus: ${name || path}\nRuang dibebaskan: ${data.reclaimed_formatted}`);
+      showToast(`Berhasil menghapus: ${name || path}. Ruang dibebaskan: ${data.freed_formatted || data.reclaimed_formatted || '0 B'}.`, 'success');
       await loadStorageDrives();
-      await triggerStorageScan();
     } else {
-      alert(`Gagal menghapus: ${data.error || 'Berkas sedang digunakan program lain.'}`);
+      showToast(`Gagal menghapus: ${data.error || 'Berkas sedang digunakan program lain.'}`, 'error');
     }
   } catch (err) {
-    alert(`Terjadi kesalahan: ${err.message}`);
+    showToast(`Terjadi kesalahan: ${err.message}`, 'error');
   }
 }
 
@@ -2390,6 +2679,68 @@ function escapeHtml(str) {
 function escapePath(str) {
   if (!str) return '';
   return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function exportDiagnosticReport() {
+  if (!allDisks || allDisks.length === 0) {
+    showToast(currentLang === 'en' ? 'No disk telemetry available to export.' : 'Belum ada telemetri disk untuk diekspor.', 'warning');
+    return;
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const sourceLabel = (disk) => getDataSourceMeta(disk).detail;
+  const diskSections = allDisks.map((disk) => {
+    const ha = disk.health_analysis || {};
+    const metrics = ha.metrics || {};
+    const health = healthValue(ha);
+    const factors = (currentLang === 'en' ? (ha.layman_factors || []).map(f => f.title_en || f.title_id) : (ha.layman_factors || []).map(f => f.title_id || f.title_en));
+    const gaps = Array.isArray(disk.data_gaps) ? disk.data_gaps : [];
+    const attrs = (disk.smart_attributes || []).map((a) => `
+      <tr><td>${escapeHtml(a.id_hex || '')}</td><td>${escapeHtml(a.name || '')}</td>
+      <td>${a.current ?? '--'}</td><td>${a.worst ?? '--'}</td><td>${a.threshold ?? '--'}</td>
+      <td>${a.raw_int ?? '--'}</td></tr>`).join('');
+    return `
+      <section>
+        <h2>${escapeHtml(disk.name)} <small>${escapeHtml(disk.drive_letters_str || '-')}</small></h2>
+        <p><b>Health:</b> ${health === null ? 'N/A' : `${health}%`} · <b>Source:</b> ${escapeHtml(sourceLabel(disk))}</p>
+        <p><b>Interface:</b> ${escapeHtml(disk.bus_type || 'N/A')} · <b>Media:</b> ${escapeHtml(disk.media_type || 'N/A')} · <b>Size:</b> ${disk.size_gb ? `${disk.size_gb} GB` : 'N/A'} · <b>Temperature:</b> ${disk.temperature_c ?? 'N/A'} °C · <b>Power-On:</b> ${disk.power_on_hours ?? 'N/A'} h</p>
+        <p><b>Data gaps:</b> ${gaps.length ? escapeHtml(gaps.join(', ')) : 'none reported'}</p>
+        <p><b>Factors:</b> ${factors.length ? escapeHtml(factors.join(' · ')) : '—'}</p>
+        <p><b>Metrics:</b> ${escapeHtml(JSON.stringify(metrics))}</p>
+        <table><thead><tr><th>ID</th><th>Attribute</th><th>Current</th><th>Worst</th><th>Threshold</th><th>Raw</th></tr></thead><tbody>${attrs || '<tr><td colspan="6">No attributes available</td></tr>'}</tbody></table>
+      </section>`;
+  }).join('');
+  const storageSection = storageResults ? `
+    <section>
+      <h2>Storage analysis</h2>
+      <p><b>Scanned:</b> ${escapeHtml((storageResults.drives_scanned || []).join(', '))} · <b>Measured coverage:</b> ${storageResults.breakdown ? storageResults.breakdown.coverage_pct : 'N/A'}%</p>
+      <p><b>Recommendations:</b> ${(storageResults.recommendations || []).length} · <b>Large items:</b> ${(storageResults.large_items || []).length} · <b>Duplicate groups:</b> ${(storageResults.duplicate_groups || []).length}</p>
+    </section>` : '';
+  const report = `<!DOCTYPE html><html lang="${currentLang}"><head><meta charset="utf-8">
+    <title>DiagnoseMyDisk Diagnostic Report</title>
+    <style>
+      body{font:14px/1.55 system-ui,Segoe UI,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#18181b}
+      h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:28px 0 8px;border-bottom:1px solid #e4e4e7;padding-bottom:6px}
+      small{font:600 12px ui-monospace,monospace;color:#71717a}p{margin:6px 0}
+      table{width:100%;border-collapse:collapse;font:12px ui-monospace,monospace;margin-top:8px}
+      th,td{border:1px solid #e4e4e7;padding:5px 7px;text-align:left}th{background:#fafafa}
+      footer{margin-top:32px;color:#71717a;font-size:12px}
+    </style></head><body>
+    <h1>DiagnoseMyDisk Diagnostic Report</h1>
+    <p>Generated ${new Date().toLocaleString()} · App version 3.0.0 · Local-only, zero telemetry</p>
+    ${diskSections}
+    ${storageSection}
+    <footer>Every unavailable field is reported as N/A or listed as a data gap. This report was generated locally and was not uploaded anywhere.</footer>
+    </body></html>`;
+  const blob = new Blob([report], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `DiagnoseMyDisk-report-${stamp}.html`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  showToast(currentLang === 'en' ? 'Diagnostic report downloaded.' : 'Laporan diagnostik berhasil diunduh.', 'success');
 }
 
 
@@ -2442,7 +2793,7 @@ function closeLogsModal() {
 
 async function fetchAppLogs() {
   try {
-    const res = await fetch('/api/logs');
+    const res = await apiFetch('/api/logs');
     const data = await res.json();
     if (data.success && data.logs) {
       renderAppLogs(data.logs, data.log_file);
@@ -2500,34 +2851,34 @@ function renderAppLogs(logs, logFilePath) {
 
 async function copyLogsToClipboard() {
   try {
-    const res = await fetch('/api/logs');
+    const res = await apiFetch('/api/logs');
     const data = await res.json();
     if (data.success && data.logs) {
       const textLines = data.logs.map(l => `[${l.timestamp}] [${l.level}] [${l.component}] ${l.message}`).join('\n');
       await navigator.clipboard.writeText(textLines);
-      alert(`Berhasil menyalin ${data.logs.length} baris log ke clipboard!`);
+      showToast(txt(`Copied ${data.logs.length} log lines to clipboard.`, `Berhasil menyalin ${data.logs.length} baris log ke clipboard.`), 'success');
     }
   } catch (err) {
-    alert(`Gagal menyalin log: ${err.message}`);
+    showToast(`Gagal menyalin log: ${err.message}`, 'error');
   }
 }
 
 async function openLogFileInNotepad() {
   try {
-    const res = await fetch('/api/open_log_file', { method: 'POST' });
+    const res = await apiFetch('/api/open_log_file', { method: 'POST' });
     const data = await res.json();
     if (!data.success) {
-      alert(`Gagal membuka file log: ${data.error}`);
+      showToast(`Gagal membuka file log: ${data.error}`, 'error');
     }
   } catch (err) {
-    alert(`Kesalahan membuka file log: ${err.message}`);
+    showToast(`Kesalahan membuka file log: ${err.message}`, 'error');
   }
 }
 
 async function clearAppLogs() {
   if (!confirm('Bersihkan seluruh log saat ini?')) return;
   try {
-    await fetch('/api/clear_logs', { method: 'POST' });
+    await apiFetch('/api/clear_logs', { method: 'POST' });
     await fetchAppLogs();
   } catch (err) {
     console.error('Failed to clear logs:', err);
@@ -2566,7 +2917,7 @@ async function toggleRecommendationFolderExpand(idx, path) {
     safeCreateIcons();
 
     try {
-      const res = await fetch(`/api/storage/inspect_folder?path=${encodeURIComponent(path)}&limit=100`);
+      const res = await apiFetch(`/api/storage/inspect_folder?path=${encodeURIComponent(path)}&limit=100`);
       const data = await res.json();
       if (data.success) {
         expandedFoldersCache.set(path, data);
@@ -2618,7 +2969,7 @@ async function toggleLargeFolderExpand(idx, path) {
     safeCreateIcons();
 
     try {
-      const res = await fetch(`/api/storage/inspect_folder?path=${encodeURIComponent(path)}&limit=100`);
+      const res = await apiFetch(`/api/storage/inspect_folder?path=${encodeURIComponent(path)}&limit=100`);
       const data = await res.json();
       if (data.success) {
         expandedFoldersCache.set(path, data);
@@ -2702,7 +3053,7 @@ function renderFolderFileList(container, data) {
         <div class="flex items-center gap-3 shrink-0">
           <span class="text-[11px] text-zinc-400 hidden sm:inline tabular-nums">${file.mtime_str || '-'}</span>
           <span class="font-semibold text-zinc-900 dark:text-zinc-100 tabular-nums min-w-[70px] text-right">${file.size_formatted}</span>
-          <button onclick="openInExplorer('${escapePath(file.path)}')" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all" title="Buka berkas di File Explorer">
+          <button onclick="openInExplorer(decodeURIComponent('${jsPathArg(file.path)}'))" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all" title="Buka berkas di File Explorer">
             <i data-lucide="folder-open" class="w-3 h-3"></i>
           </button>
         </div>

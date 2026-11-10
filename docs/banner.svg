@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">DiagnoseMyDisk — evidence-based storage diagnostics for Windows</title>
+  <desc id="desc">Dark banner with product name, offline privacy badge, and feature chips for True Health, S.M.A.R.T forensics, surface LBA map, and safe cleanup.</desc>
+  <rect width="1200" height="320" fill="#09090B"/>
+  <g stroke="#27272A" stroke-width="1" opacity="0.7">
+    <path d="M0 80 H1200 M0 160 H1200 M0 240 H1200"/>
+    <path d="M120 0 V320 M240 0 V320 M360 0 V320 M480 0 V320 M600 0 V320 M720 0 V320 M840 0 V320 M960 0 V320 M1080 0 V320"/>
+  </g>
+  <rect x="0" y="0" width="8" height="320" fill="#2563EB"/>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <rect x="64" y="48" width="240" height="26" rx="13" fill="#101014" stroke="#3F3F46"/>
+    <circle cx="79" cy="61" r="4" fill="#10B981"/>
+    <text x="93" y="65" fill="#A1A1AA" font-size="11" font-weight="700" letter-spacing="1.2">WINDOWS 10 / 11 · 100% OFFLINE</text>
+
+    <text x="64" y="132" fill="#FAFAFA" font-size="52" font-weight="800" letter-spacing="-1.5">Diagnose<tspan fill="#60A5FA">MyDisk</tspan></text>
+    <text x="66" y="174" fill="#A1A1AA" font-size="18" font-weight="500">Evidence-based storage diagnostics. No telemetry. No fabricated numbers.</text>
+
+    <g font-size="12" font-weight="700">
+      <rect x="64" y="208" width="126" height="30" rx="6" fill="#0C1A2E" stroke="#1D4ED8"/>
+      <text x="78" y="228" fill="#93C5FD">TRUE HEALTH</text>
+      <rect x="200" y="208" width="176" height="30" rx="6" fill="#101014" stroke="#3F3F46"/>
+      <text x="214" y="228" fill="#D4D4D8">S.M.A.R.T FORENSICS</text>
+      <rect x="386" y="208" width="142" height="30" rx="6" fill="#101014" stroke="#3F3F46"/>
+      <text x="400" y="228" fill="#D4D4D8">SURFACE LBA MAP</text>
+      <rect x="538" y="208" width="120" height="30" rx="6" fill="#081B13" stroke="#047857"/>
+      <text x="552" y="228" fill="#6EE7B7">SAFE CLEANUP</text>
+    </g>
+
+    <text x="64" y="278" fill="#52525B" font-size="12" font-weight="600" letter-spacing="0.6">LOCAL LOOPBACK ONLY · UU PDP ALIGNED · ZERO EXTERNAL REQUESTS</text>
+  </g>
+
+  <g transform="translate(920 64)">
+    <circle cx="120" cy="96" r="82" fill="#101014" stroke="#27272A" stroke-width="2"/>
+    <circle cx="120" cy="96" r="64" fill="none" stroke="#1F2937" stroke-width="12"/>
+    <circle cx="120" cy="96" r="64" fill="none" stroke="#10B981" stroke-width="12" stroke-linecap="round"
+            stroke-dasharray="401.9" stroke-dashoffset="56.3" transform="rotate(-90 120 96)"/>
+    <text x="120" y="90" text-anchor="middle" fill="#FAFAFA" font-family="Consolas, monospace" font-size="38" font-weight="800">86%</text>
+    <text x="120" y="116" text-anchor="middle" fill="#71717A" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.4">TRUE HEALTH</text>
+    <text x="120" y="140" text-anchor="middle" fill="#F59E0B" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="700">FIRMWARE MASK DETECTED</text>
+
+    <g transform="translate(28 104)">
+      <rect x="0" y="0" width="8" height="46" rx="2" fill="#10B981"/>
+      <rect x="14" y="14" width="8" height="32" rx="2" fill="#2563EB"/>
+      <rect x="28" y="4" width="8" height="42" rx="2" fill="#60A5FA"/>
+      <rect x="42" y="22" width="8" height="24" rx="2" fill="#F59E0B"/>
+      <rect x="56" y="10" width="8" height="36" rx="2" fill="#3F3F46"/>
+      <rect x="70" y="0" width="8" height="46" rx="2" fill="#10B981"/>
+      <rect x="84" y="18" width="8" height="28" rx="2" fill="#2563EB"/>
+      <rect x="98" y="8" width="8" height="38" rx="2" fill="#60A5FA"/>
+      <rect x="112" y="26" width="8" height="20" rx="2" fill="#3F3F46"/>
+      <rect x="126" y="12" width="8" height="34" rx="2" fill="#10B981"/>
+      <rect x="140" y="2" width="8" height="44" rx="2" fill="#2563EB"/>
+    </g>
+  </g>
+</svg>

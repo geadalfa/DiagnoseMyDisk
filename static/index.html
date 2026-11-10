@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="app-token" content="__APP_TOKEN__">
   <title>DiagnoseMyDisk - Diagnostik Kesehatan, Bad Sector & Telemetri S.M.A.R.T</title>
   <meta name="color-scheme" content="light dark">
   
@@ -31,7 +32,7 @@
   <!-- Offline Native Desktop Assets (Zero External CDN Dependency) -->
   <script src="tailwind.min.js"></script>
   <script src="lucide.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=2.1.1">
+  <link rel="stylesheet" href="style.css?v=3.0.0">
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -62,12 +63,12 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="text-sm font-black tracking-tight text-zinc-900 dark:text-zinc-50">Diagnose<span class="text-blue-600 dark:text-blue-400">MyDisk</span></span>
-            <span class="px-1.5 py-0.2 text-[10px] font-mono font-bold rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700">v2.1.1</span>
+            <span class="px-1.5 py-0.2 text-[10px] font-mono font-bold rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700">v__APP_VERSION__</span>
             
             <!-- Admin Status Badge -->
             <div id="admin-badge-container" class="flex items-center gap-1.5 pl-1.5">
               <span id="admin-dot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span id="lbl-admin-status" class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 font-mono">Admin OK</span>
+              <span id="lbl-admin-status" class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap">Admin OK</span>
             </div>
           </div>
           <p class="text-[11px] text-zinc-500 dark:text-zinc-400 hidden md:block" id="header-subtitle">Verifikasi Kesehatan Sebenarnya, Bad Sector, Telemetri S.M.A.R.T & Manajemen Penyimpanan</p>
@@ -121,6 +122,12 @@
           <span id="txt-btn-logs" class="hidden sm:inline">Log</span>
         </button>
 
+        <!-- Export Report -->
+        <button onclick="exportDiagnosticReport()" id="btn-export-report" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-medium shadow-xs transition-all" title="Ekspor laporan diagnostik sebagai file HTML">
+          <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-500"></i>
+          <span id="txt-export-report" class="hidden sm:inline">Ekspor</span>
+        </button>
+
         <!-- Rescan Action Button -->
         <button onclick="refreshData()" id="btn-refresh" class="flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-all active:scale-95">
           <i data-lucide="refresh-cw" id="refresh-icon" class="w-3.5 h-3.5"></i>
@@ -145,12 +152,23 @@
     </div>
   </div>
 
+  <!-- TELEMETRY PROVENANCE / DATA GAP NOTICE -->
+  <div id="telemetry-gap-banner" class="hidden shrink-0 bg-blue-500/10 border-b border-blue-500/25 px-4 py-1.5 text-[11px] text-blue-900 dark:text-blue-200">
+    <div class="max-w-[1440px] mx-auto flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2 min-w-0">
+        <i data-lucide="database-zap" class="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0"></i>
+        <span id="telemetry-gap-text" class="truncate">Sumber telemetri dan nilai yang tidak tersedia akan ditandai secara eksplisit.</span>
+      </div>
+      <span id="telemetry-source-badge" class="font-mono font-bold px-2 py-0.5 rounded border border-blue-400/40 bg-blue-500/10 shrink-0">--</span>
+    </div>
+  </div>
+
   <!-- SCROLLABLE VIEWPORT AREA -->
   <main class="flex-1 min-h-0 overflow-y-auto px-4 py-3.5">
     <div class="max-w-[1440px] mx-auto space-y-3.5">
 
       <!-- SECTION: DRIVE SELECTION TABS -->
-      <section class="space-y-1.5">
+      <section class="space-y-1.5" id="drive-selector-section">
         <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 font-medium px-0.5">
           <div class="flex items-center gap-1.5">
             <i data-lucide="hard-drive" class="w-3.5 h-3.5"></i>
@@ -180,7 +198,7 @@
       </div>
 
       <!-- SECTION: MAIN DRIVE HERO CARD -->
-      <section class="app-surface p-4">
+      <section class="app-surface p-4" id="disk-hero-section">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
           
           <!-- Column 1: Health & Temperature Metrics -->
@@ -190,7 +208,7 @@
             <div class="flex flex-col items-center text-center">
               <span class="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1" id="txt-health-status-header">Status Kesehatan</span>
               <div id="cdi-health-badge" class="w-44 py-2.5 px-3 rounded-lg flex flex-col items-center justify-center text-center select-none shadow-xs border">
-                <div id="badge-label" class="text-sm font-black tracking-wide uppercase">Good</div>
+                <div id="badge-label" class="text-sm font-black tracking-wide uppercase">Loading</div>
                 <div id="badge-percentage" class="text-3xl font-extrabold tracking-tight font-mono tabular-nums mt-0.5">--%</div>
                 <div id="badge-sub" class="text-[10px] opacity-90 font-medium">True Health</div>
               </div>
@@ -206,7 +224,7 @@
                 <i data-lucide="thermometer" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
                 <span id="badge-temp" class="text-xl font-black font-mono tabular-nums">-- °C</span>
               </div>
-              <span id="badge-temp-desc" class="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Suhu Normal</span>
+              <span id="badge-temp-desc" class="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold mt-1">Menunggu data</span>
             </div>
 
           </div>
@@ -220,6 +238,7 @@
                 <div class="flex items-center gap-2 flex-wrap">
                   <h2 id="disk-model-name" class="text-base font-black text-zinc-900 dark:text-zinc-50 tracking-tight">--</h2>
                   <div id="disk-hero-badges" class="flex items-center gap-1.5 flex-wrap"></div>
+                  <span id="disk-data-source-badge" class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300" title="Sumber data telemetri drive ini">--</span>
                 </div>
                 <div class="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 flex-wrap">
                   <span id="disk-capacity-type" class="font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">-- GB</span>
@@ -293,7 +312,7 @@
               </div>
               <div class="flex justify-between text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
                 <span id="capacity-warning">Sisa ruang aman</span>
-                <span id="waf-multiplier" class="tabular-nums">Write Amplification: 1.0x</span>
+                <span id="waf-multiplier" class="tabular-nums">Write Amplification: N/A</span>
               </div>
             </div>
 
@@ -803,6 +822,7 @@
               </button>
             </div>
           </div>
+          <p id="txt-recommendations-summary" class="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono px-0.5">Belum ada pemindaian pada sesi ini.</p>
 
           <!-- Recommendations Checklist Container -->
           <div id="recommendations-container" class="space-y-2">
@@ -817,7 +837,7 @@
               <!-- Size Filter -->
               <div class="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700">
                 <span class="text-zinc-500" id="lbl-large-filter">Ukuran:</span>
-                <select id="filter-large-size" onchange="renderLargeItems()" class="bg-transparent font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer focus:outline-none">
+                <select id="filter-large-size" onchange="onLargeSizeChange()" class="bg-transparent font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer focus:outline-none">
                   <option value="all">Semua Ukuran</option>
                   <option value="1000">&gt; 1 GB</option>
                   <option value="500">&gt; 500 MB</option>
@@ -828,7 +848,7 @@
               <!-- Type Filter -->
               <div class="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700">
                 <span class="text-zinc-500" id="lbl-large-type">Tipe:</span>
-                <select id="filter-large-type" onchange="renderLargeItems()" class="bg-transparent font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer focus:outline-none">
+                <select id="filter-large-type" onchange="onLargeTypeChange()" class="bg-transparent font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer focus:outline-none">
                   <option value="all">Folder &amp; Berkas</option>
                   <option value="file">Hanya Berkas</option>
                   <option value="dir">Hanya Folder</option>
@@ -838,7 +858,7 @@
               <!-- Sort Order -->
               <div class="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700">
                 <span class="text-zinc-500" id="lbl-large-sort">Urutan:</span>
-                <select id="sort-large-order" onchange="renderLargeItems()" class="bg-transparent font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer focus:outline-none">
+                <select id="sort-large-order" onchange="onLargeSortChange()" class="bg-transparent font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer focus:outline-none">
                   <option value="desc" selected>Terbesar &rarr; Terkecil</option>
                   <option value="asc">Terkecil &rarr; Terbesar</option>
                 </select>
@@ -848,8 +868,9 @@
             <!-- Search input -->
             <div class="relative w-full sm:w-64">
               <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2.5"></i>
-              <input type="text" id="search-large-input" oninput="renderLargeItems()" placeholder="Cari nama berkas/folder..." class="w-full pl-8 pr-3 py-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs focus:outline-none focus:border-blue-500 text-zinc-800 dark:text-zinc-200">
+              <input type="text" id="search-large-input" oninput="onLargeSearchInput()" placeholder="Cari nama berkas/folder..." class="w-full pl-8 pr-3 py-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs focus:outline-none focus:border-blue-500 text-zinc-800 dark:text-zinc-200">
             </div>
+            <span id="large-items-summary" class="text-zinc-400 font-mono text-[11px] w-full sm:w-auto sm:ml-auto">Belum ada hasil pemindaian</span>
           </div>
 
           <!-- Large Items Table -->
@@ -858,10 +879,11 @@
               <table class="w-full text-left text-xs border-collapse">
                 <thead class="bg-zinc-100 dark:bg-zinc-850 border-b border-zinc-200 dark:border-zinc-700/60 sticky top-0 z-10 text-[11px] font-mono text-zinc-500">
                   <tr>
-                    <th class="py-2 px-3 font-semibold" id="th-name">NAMA ITEM</th>
-                    <th class="py-2 px-3 font-semibold w-24 text-right" id="th-size">UKURAN</th>
-                    <th class="py-2 px-3 font-semibold w-36" id="th-mtime">TERAKHIR DIUBAH</th>
-                    <th class="py-2 px-3 font-semibold w-28 text-center" id="th-action">AKSI</th>
+                    <th class="py-2 px-3 font-semibold" id="th-large-name">NAMA ITEM</th>
+                    <th class="py-2 px-3 font-semibold w-24 text-center" id="th-large-type">TIPE</th>
+                    <th class="py-2 px-3 font-semibold w-24 text-right" id="th-large-size">UKURAN</th>
+                    <th class="py-2 px-3 font-semibold w-36" id="th-large-mtime">TERAKHIR DIUBAH</th>
+                    <th class="py-2 px-3 font-semibold w-28 text-center" id="th-large-action">AKSI</th>
                   </tr>
                 </thead>
                 <tbody id="table-large-items" class="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono text-[11px]">
@@ -897,7 +919,7 @@
                     <th class="py-2 px-3 font-semibold" id="th-old-name">NAMA BERKAS / APLIKASI</th>
                     <th class="py-2 px-3 font-semibold w-24 text-right" id="th-old-size">UKURAN</th>
                     <th class="py-2 px-3 font-semibold w-28 text-center" id="th-old-age">USIA</th>
-                    <th class="py-2 px-3 font-semibold w-36" id="th-old-mtime">TERAKHIR DIAKSES</th>
+                    <th class="py-2 px-3 font-semibold w-36" id="th-old-mtime">TERAKHIR DIUBAH</th>
                     <th class="py-2 px-3 font-semibold w-28 text-center" id="th-old-action">AKSI</th>
                   </tr>
                 </thead>
@@ -948,7 +970,7 @@
     <div class="flex items-center gap-2 truncate">
       <span class="font-bold text-zinc-800 dark:text-zinc-200" id="status-active-disk">Drive 0: --</span>
       <span>•</span>
-      <span id="status-telemetry-source">Sumber: Windows CIM WMI & Hardware Engine</span>
+      <span id="status-telemetry-source">Sumber: menunggu telemetri</span>
     </div>
     <div class="flex items-center gap-3 shrink-0 tabular-nums">
       <span id="status-timestamp">Pembaruan: --</span>
@@ -956,6 +978,9 @@
       <span id="txt-footer-license">Open-Source</span>
     </div>
   </footer>
+
+  <!-- TOAST NOTIFICATION LAYER -->
+  <div id="toast-container" aria-live="polite" aria-atomic="false" class="fixed bottom-10 right-4 z-[70] flex flex-col gap-2 w-[min(380px,calc(100vw-2rem))] pointer-events-none"></div>
 
   <!-- MODAL: GLOSARIUM & PANDUAN TEKNOLOGI NAND FLASH & HARDWARE DISK -->
   <div id="glossary-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity duration-200">
@@ -1169,6 +1194,6 @@
     </div>
   </div>
 
-    <script src="app.js?v=2.1.1"></script>
+    <script src="app.js?v=3.0.0"></script>
 </body>
 </html>

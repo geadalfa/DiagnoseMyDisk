@@ -366,6 +366,23 @@ def detect_hardware_profile(name, media_type="SSD", bus_type="SATA", size_gb=0, 
         "summary_en": generate_summary_en(clean_name, is_ssd, is_nvme, nand_type, cell_bits, dram_cache),
     }
 
+    known_tokens = (
+        "LEGEND 900", "LEGEND 800", "LEGEND 850", "LEGEND 700", "SU650", "SU630",
+        "SU800", "SX8200", "SDSSDA", "SANDISK SSD PLUS", "WD20EZAZ", "WD20EZEX",
+        "SN850", "SN770", "BX500", "NV2", "KC3000", "FURY RENEGADE", "A400",
+    )
+    profile_confidence = "vendor-model" if any(token in clean_name for token in known_tokens) else "generic-estimate"
+    profile_note_id = (
+        "Spesifikasi NAND/controller berasal dari pencocokan model publik; tetap verifikasi dengan datasheet pabrikan."
+        if profile_confidence == "vendor-model"
+        else "Model ini belum ada di basis data internal. Tipe sel flash dan controller adalah estimasi umum, bukan hasil pembacaan firmware."
+    )
+    profile_note_en = (
+        "NAND/controller specifications come from public model matching; verify against the vendor datasheet."
+        if profile_confidence == "vendor-model"
+        else "This model is not in the internal database. Flash cell type and controller are generic estimates, not firmware reads."
+    )
+
     return {
         "nand_type": nand_type,
         "cell_tech_name": cell_tech_name,
@@ -375,6 +392,9 @@ def detect_hardware_profile(name, media_type="SSD", bus_type="SATA", size_gb=0, 
         "interface_standard": interface_standard,
         "durability_pe_cycles": durability_pe_cycles,
         "slc_cache_type": slc_cache_type,
+        "profile_confidence": profile_confidence,
+        "profile_note_id": profile_note_id,
+        "profile_note_en": profile_note_en,
         "features": features_list,
         "explanation": explanation
     }

@@ -26,9 +26,13 @@ import time
 import threading
 import subprocess
 import webbrowser
+import hmac
+import re
+import secrets
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import urllib.parse
 import urllib.request
+from urllib.parse import urlsplit
 
 # Deteksi root directory (apakah PyInstaller frozen bundle atau Python script biasa)
 if getattr(sys, "frozen", False):
@@ -52,8 +56,26 @@ except ImportError:
 
 PORT = 5550
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+APP_VERSION = "3.0.0"
+APP_TOKEN = secrets.token_urlsafe(32)
+MAX_BODY_BYTES = 1024 * 1024
+LOCAL_HOSTNAMES = {"127.0.0.1", "localhost"}
+DRIVE_TARGET_RE = re.compile(r"^[A-Za-z](?::[\\/]?|[\\/])?$")
 
-# Persistent User Preferences Path (v2.1.1)
+
+def normalize_drive_target(value):
+    """Return a canonical drive target (letter, C:, or all) or None when invalid."""
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    if cleaned.lower() == "all":
+        return "all"
+    if not DRIVE_TARGET_RE.match(cleaned):
+        return None
+    letter = cleaned[0].upper()
+    return f"{letter}:"
+
+# Persistent User Preferences Path (v3.0.0)
 PREFERENCES_FILE = os.path.join(
     os.environ.get("LOCALAPPDATA", BASE_DIR),
     "DiagnoseMyDisk_Profile",
@@ -125,6 +147,16 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
+        self.send_header("X-App-Id", "DiagnoseMyDisk")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+            "connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+        )
         super().end_headers()
 
     def _send_json(self, data, status=200):
@@ -133,26 +165,101 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(body)
         except Exception:
             pass
 
+    def _is_local_request(self):
+        host = (self.headers.get("Host") or "").strip()
+        hostname = host.rsplit(":", 1)[0].strip("[]").lower() if host else ""
+        if hostname not in LOCAL_HOSTNAMES:
+            return False, "Host header tidak diizinkan."
+
+        origin = (self.headers.get("Origin") or "").strip()
+        if origin and origin.lower() != "null":
+            parsed = urlsplit(origin)
+            if parsed.netloc.lower() != host.lower():
+                return False, "Origin lintas situs ditolak."
+        return True, ""
+
+    def _is_authorized_api(self, qs):
+        ok, reason = self._is_local_request()
+        if not ok:
+            self._send_json({"success": False, "error": reason}, status=403)
+            return False
+
+        supplied = (self.headers.get("X-App-Token") or "").strip()
+        if not supplied:
+            supplied = (qs.get("token", [""])[0] or "").strip()
+        if not hmac.compare_digest(supplied, APP_TOKEN):
+            self._send_json({"success": False, "error": "Sesi API tidak valid. Muat ulang aplikasi."}, status=401)
+            return False
+
+        if self.command == "POST":
+            length_header = self.headers.get("Content-Length")
+            try:
+                content_length = int(length_header or 0)
+            except ValueError:
+                content_length = -1
+            if content_length < 0 or content_length > MAX_BODY_BYTES:
+                # Drain a bounded amount so the client receives the 413 cleanly.
+                try:
+                    remaining = min(content_length, MAX_BODY_BYTES * 2)
+                    while remaining > 0:
+                        chunk = self.rfile.read(min(65536, remaining))
+                        if not chunk:
+                            break
+                        remaining -= len(chunk)
+                except Exception:
+                    pass
+                self.close_connection = True
+                self._send_json({"success": False, "error": "Ukuran permintaan melebihi batas."}, status=413)
+                return False
+        return True
+
+    def _read_json_body(self):
+        try:
+            content_length = int(self.headers.get("Content-Length", 0) or 0)
+        except ValueError:
+            content_length = 0
+        if content_length <= 0:
+            return {}
+        raw = self.rfile.read(min(content_length, MAX_BODY_BYTES))
+        try:
+            parsed = json.loads(raw.decode("utf-8"))
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+
+    def _serve_index(self):
+        try:
+            index_path = os.path.join(STATIC_DIR, "index.html")
+            with open(index_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            html = html.replace("__APP_TOKEN__", APP_TOKEN).replace("__APP_VERSION__", APP_VERSION)
+            body = html.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception as e:
+            self._send_json({"success": False, "error": str(e)}, status=500)
+
     def do_POST(self):
         parsed_path = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(parsed_path.query)
 
-        # Baca body JSON jika ada
-        body_data = {}
-        try:
-            content_len = int(self.headers.get("Content-Length", 0))
-            if content_len > 0:
-                raw_bytes = self.rfile.read(content_len)
-                body_data = json.loads(raw_bytes.decode("utf-8"))
-        except Exception:
-            pass
+        if not parsed_path.path.startswith("/api/"):
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        if not self._is_authorized_api(qs):
+            return
+
+        body_data = self._read_json_body()
 
         if parsed_path.path == "/api/shutdown":
             self._send_json({"status": "shutting_down"})
@@ -174,28 +281,40 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 self._send_json({"success": False, "error": str(e)}, status=500)
             return
 
-        elif parsed_path.path == "/api/repair_trim":
-            drive = body_data.get("drive") or (qs.get("drive", ["C"])[0])
-            result = scanner.run_trim_optimization(drive)
-            self._send_json(result)
-            return
-
-        elif parsed_path.path == "/api/repair_chkdsk":
-            drive = body_data.get("drive") or (qs.get("drive", ["C"])[0])
-            result = scanner.repair_filesystem(drive)
+        elif parsed_path.path in ("/api/repair_trim", "/api/repair_chkdsk"):
+            drive_raw = body_data.get("drive") or (qs.get("drive", [""])[0])
+            drive = normalize_drive_target(drive_raw)
+            if not drive or drive == "all":
+                self._send_json({"success": False, "error": "Huruf drive tidak valid."}, status=400)
+                return
+            if parsed_path.path == "/api/repair_trim":
+                result = scanner.run_trim_optimization(drive)
+            else:
+                result = scanner.repair_filesystem(drive)
             self._send_json(result)
             return
 
         elif parsed_path.path == "/api/storage/start_scan":
             try:
                 drive_input = body_data.get("drives") or body_data.get("drive") or "all"
-                if isinstance(drive_input, str):
-                    drive_letters = [drive_input]
-                else:
-                    drive_letters = list(drive_input)
+                raw_items = [drive_input] if isinstance(drive_input, str) else list(drive_input)
+                drive_letters = []
+                for item in raw_items:
+                    normalized = normalize_drive_target(item)
+                    if normalized is None:
+                        self._send_json(
+                            {"success": False, "error": "Target pemindaian hanya boleh berupa huruf drive atau 'all'."},
+                            status=400,
+                        )
+                        return
+                    drive_letters.append(normalized)
 
-                scan_duplicates = body_data.get("scan_duplicates", True)
-                min_large_mb = body_data.get("min_large_mb", 50)
+                scan_duplicates = bool(body_data.get("scan_duplicates", True))
+                try:
+                    min_large_mb = max(0, min(102400, int(body_data.get("min_large_mb", 50))))
+                except (TypeError, ValueError):
+                    min_large_mb = 50
+
                 sm = storage_manager.get_storage_manager()
                 ok, msg = sm.start_scan(drive_letters, scan_duplicates, min_large_mb)
                 self._send_json({"success": ok, "message": msg})
@@ -235,12 +354,15 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
         elif parsed_path.path == "/api/storage/inspect_folder":
             try:
                 target_path = body_data.get("path", "")
-                if not target_path:
+                if not target_path or not isinstance(target_path, str):
                     self._send_json({"success": False, "error": "Field path harus disertakan."}, status=400)
                     return
-                limit = int(body_data.get("limit", 100))
+                try:
+                    limit = max(1, min(500, int(body_data.get("limit", 100))))
+                except (TypeError, ValueError):
+                    limit = 100
                 sm = storage_manager.get_storage_manager()
-                res = sm.inspect_directory(target_path, limit=limit)
+                res = sm.inspect_directory(target_path, limit=limit, enforce_allowlist=True)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=500)
@@ -258,28 +380,48 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
         elif parsed_path.path == "/api/storage/clean":
             try:
                 paths = body_data.get("paths", [])
-                res = storage_manager.execute_cleanup(paths)
+                if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
+                    self._send_json({"success": False, "error": "Daftar paths tidak valid."}, status=400)
+                    return
+                sm = storage_manager.get_storage_manager()
+                res = sm.clean_paths(paths)
                 self._send_json(res)
             except Exception as e:
+                app_logger.log_error("Server", f"Cleanup failure: {e}")
                 self._send_json({"success": False, "error": str(e)}, status=500)
             return
 
         elif parsed_path.path == "/api/storage/open_explorer":
             try:
                 target_path = body_data.get("path", "")
-                ok, msg = storage_manager.open_in_explorer(target_path)
+                if not isinstance(target_path, str):
+                    self._send_json({"success": False, "error": "Path tidak valid."}, status=400)
+                    return
+                sm = storage_manager.get_storage_manager()
+                ok, msg = sm.open_in_explorer(target_path)
                 self._send_json({"success": ok, "message": msg})
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=500)
             return
 
-        self.send_response(404)
-        self.end_headers()
+        self._send_json({"success": False, "error": "Endpoint tidak ditemukan."}, status=404)
 
     def do_GET(self):
         global cached_disks_data, last_heartbeat, has_received_heartbeat
         parsed_path = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(parsed_path.query)
+
+        if parsed_path.path in ("/", "/index.html"):
+            ok, _ = self._is_local_request()
+            if not ok:
+                self._send_json({"success": False, "error": "Host header tidak diizinkan."}, status=403)
+                return
+            self._serve_index()
+            return
+
+        if parsed_path.path.startswith("/api/"):
+            if not self._is_authorized_api(qs):
+                return
 
         if parsed_path.path == "/api/heartbeat":
             last_heartbeat = time.time()
@@ -288,8 +430,7 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
             return
 
         elif parsed_path.path == "/api/shutdown":
-            self._send_json({"status": "shutting_down"})
-            threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start()
+            self._send_json({"success": False, "error": "Gunakan POST untuk mematikan aplikasi."}, status=405)
             return
 
         elif parsed_path.path == "/api/glossary":
@@ -308,6 +449,7 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
 
                 resp = {
                     "success": True,
+                    "version": APP_VERSION,
                     "is_admin": is_admin(),
                     "disks": data_to_send,
                     "glossary": get_flash_technology_glossary(),
@@ -326,6 +468,7 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
 
                 resp = {
                     "success": True,
+                    "version": APP_VERSION,
                     "refreshed": True,
                     "is_admin": is_admin(),
                     "disks": cached_disks_data or new_data,
@@ -339,9 +482,9 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
         elif parsed_path.path == "/api/scan_chunk":
             try:
                 raw_idx = qs.get("disk_index", ["0"])[0]
-                import re
                 idx_digits = re.findall(r"\d+", raw_idx)
                 disk_index = int(idx_digits[0]) if idx_digits else 0
+                disk_index = max(0, min(63, disk_index))
 
                 def safe_int(val, default=0):
                     try:
@@ -349,10 +492,11 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                     except Exception:
                         return default
 
-                start_block = safe_int(qs.get("start_block", [0])[0], 0)
-                count = safe_int(qs.get("count", [10])[0], 10)
-                total_blocks = safe_int(qs.get("total_blocks", [200])[0], 200)
-                known_size = safe_int(qs.get("disk_size", [0])[0], 0)
+                start_block = max(0, safe_int(qs.get("start_block", [0])[0], 0))
+                count = max(1, min(64, safe_int(qs.get("count", [10])[0], 10)))
+                total_blocks = max(20, min(1000, safe_int(qs.get("total_blocks", [200])[0], 200)))
+                known_size = max(0, min(64 * 1024**4, safe_int(qs.get("disk_size", [0])[0], 0)))
+                start_block = min(start_block, total_blocks - 1)
 
                 blocks = scanner.scan_disk_chunk(
                     disk_index=disk_index,
@@ -368,7 +512,10 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
 
         elif parsed_path.path == "/api/dirty_check":
             try:
-                drive = qs.get("drive", ["C"])[0]
+                drive = normalize_drive_target(qs.get("drive", [""])[0])
+                if not drive or drive == "all":
+                    self._send_json({"success": False, "error": "Huruf drive tidak valid."}, status=400)
+                    return
                 res = scanner.check_dirty_bit(drive)
                 self._send_json(res)
             except Exception as e:
@@ -407,9 +554,12 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 if not target_path:
                     self._send_json({"success": False, "error": "Parameter path harus disertakan."}, status=400)
                     return
-                limit = int(qs.get("limit", [100])[0])
+                try:
+                    limit = max(1, min(500, int(qs.get("limit", [100])[0])))
+                except (TypeError, ValueError):
+                    limit = 100
                 sm = storage_manager.get_storage_manager()
-                res = sm.inspect_directory(target_path, limit=limit)
+                res = sm.inspect_directory(target_path, limit=limit, enforce_allowlist=True)
                 self._send_json(res)
             except Exception as e:
                 self._send_json({"success": False, "error": str(e)}, status=500)
@@ -477,19 +627,12 @@ def launch_app_window(url):
 
 
 def is_server_already_running(port):
-    """Cek apakah instansi DiagnoseMyDisk lain sudah berjalan di port ini dengan versi v2.0.0 terbaru."""
+    """Cek apakah instans DiagnoseMyDisk lain sudah melayani port ini (tanpa mematikannya)."""
     try:
-        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/storage/drives", method="GET")
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/", method="GET")
         with urllib.request.urlopen(req, timeout=1.5) as resp:
-            if resp.status == 200:
-                return True
+            return resp.status == 200 and resp.headers.get("X-App-Id") == "DiagnoseMyDisk"
     except Exception:
-        # Jika server aktif adalah versi lama (v1.x), matikan agar v2.0.0 bisa menggantikannya
-        try:
-            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/shutdown", timeout=1.0)
-            time.sleep(0.6)
-        except Exception:
-            pass
         return False
 
 

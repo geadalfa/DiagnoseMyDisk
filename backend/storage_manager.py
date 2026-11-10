@@ -5,6 +5,7 @@ rekomendasi pembersihan cerdas, dan integrasi penjelajah berkas Windows (Explore
 """
 
 import os
+import re
 import sys
 import time
 import hashlib
@@ -34,6 +35,76 @@ SYSTEM_EXCLUDED_NAMES = {
 
 # Windows File Attribute Flag
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+
+MAX_SCAN_FILES = 200_000
+MAX_LARGE_ITEMS = 5_000
+MAX_OLD_ITEMS = 5_000
+MAX_DUP_CANDIDATES = 60_000
+MAX_DUP_GROUPS = 250
+MAX_HASH_BYTES = 8 * 1024**3
+MAX_RECOMMENDATION_WALK_SECONDS = 8.0
+MAX_INSPECT_ITEMS = 5_000
+
+# Paths that must never be deleted, even when they appear in a scan result.
+PROTECTED_DIR_NAMES = {
+    "windows",
+    "windowsapps",
+    "program files",
+    "program files (x86)",
+    "programdata",
+    "system volume information",
+    "recovery",
+    "boot",
+    "$windows.~bt",
+    "$windows.~ws",
+    "users",
+}
+
+
+def _norm_path(path):
+    try:
+        return os.path.normcase(os.path.realpath(os.path.abspath(path)))
+    except Exception:
+        return os.path.normcase(os.path.abspath(path))
+
+
+def _is_within(path, root):
+    """True when path is root or a descendant of root (case-insensitive on Windows)."""
+    try:
+        path_n = _norm_path(path)
+        root_n = _norm_path(root)
+        return os.path.commonpath([path_n, root_n]) == root_n
+    except Exception:
+        return False
+
+
+def _is_drive_root(path):
+    drive, tail = os.path.splitdrive(os.path.abspath(path))
+    return bool(drive) and tail in ("\\", "/", "")
+
+
+def _is_protected_dir(path):
+    if _is_drive_root(path):
+        return True
+    normalized = os.path.normpath(path)
+    leaf = os.path.basename(normalized).lower()
+    if leaf in PROTECTED_DIR_NAMES:
+        return True
+    user_profile = os.environ.get("USERPROFILE")
+    if user_profile and _norm_path(normalized) == _norm_path(user_profile):
+        return True
+    return False
+
+
+def _is_system_managed_path(path):
+    """Files under OS/application trees are never deleted by the generic file list."""
+    roots = [
+        os.environ.get("SystemRoot", r"C:\Windows"),
+        os.environ.get("ProgramFiles", r"C:\Program Files"),
+        os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+        os.environ.get("ProgramData", r"C:\ProgramData"),
+    ]
+    return any(root and _is_within(path, root) for root in roots)
 
 
 def is_reparse_point(entry):
@@ -115,6 +186,14 @@ class StorageManager:
         self.bytes_scanned = 0
         self.start_time = 0
         self.scan_thread = None
+        self.scan_truncated = False
+
+        # Keamanan: hanya path yang muncul pada hasil pemindaian terakhir yang boleh
+        # dibuka, diperiksa, atau dibersihkan melalui API lokal.
+        self.allowed_clean_roots = set()
+        self.allowed_clean_files = set()
+        self.allowed_inspect_roots = set()
+        self.allowed_recycle_roots = set()
 
         # Hasil Analisis
         self.results = {
@@ -143,7 +222,8 @@ class StorageManager:
                 "bytes_scanned": self.bytes_scanned,
                 "bytes_scanned_formatted": format_bytes(self.bytes_scanned),
                 "elapsed_seconds": round(elapsed, 1),
-                "has_results": bool(self.results.get("timestamp"))
+                "has_results": bool(self.results.get("timestamp")),
+                "truncated": self.scan_truncated,
             }
 
     def cancel_scan(self):
@@ -155,6 +235,23 @@ class StorageManager:
         return False
 
     def start_scan(self, drive_letters=None, scan_duplicates=True, min_large_mb=100, min_dup_bytes=512*1024):
+        if drive_letters is not None:
+            if not isinstance(drive_letters, (list, tuple)) or not drive_letters:
+                return False, "Target pemindaian tidak valid."
+            normalized_targets = []
+            for item in drive_letters:
+                if not isinstance(item, str):
+                    return False, "Target pemindaian tidak valid."
+                value = item.strip()
+                if value.lower() == "all":
+                    normalized_targets.append("all")
+                    continue
+                match = re.match(r"^([A-Za-z])(?::[\\/]?|[\\/])?$", value)
+                if not match:
+                    return False, "Target pemindaian hanya boleh berupa huruf drive atau 'all'."
+                normalized_targets.append(f"{match.group(1).upper()}:")
+            drive_letters = normalized_targets
+
         with self.lock:
             if self.is_scanning:
                 app_logger.log_warn("StorageManager", "Scan request rejected: scan already in progress.")
@@ -165,6 +262,7 @@ class StorageManager:
             self.progress = 0
             self.files_scanned = 0
             self.bytes_scanned = 0
+            self.scan_truncated = False
             self.status_text = "Menyiapkan pemindaian..."
             self.start_time = time.time()
 
@@ -178,7 +276,7 @@ class StorageManager:
         self.scan_thread.start()
         return True, "Pemindaian dimulai."
 
-    def _run_scan_worker(self, drive_letters, scan_duplicates=True, min_large_mb=50, min_dup_bytes=512*1024):
+    def _run_scan_worker(self, drive_letters, scan_duplicates=True, min_large_mb=50, min_dup_bytes=512*1024, include_recommendations=True):
         try:
             all_drives = get_available_drives()
             target_drives = []
@@ -216,15 +314,20 @@ class StorageManager:
             large_items = []
             old_items = []
             size_candidates = {}  # { size: [file_paths] }
+            dup_candidate_count = 0
             now = time.time()
             one_day = 86400
             min_large_bytes = min_large_mb * 1024 * 1024
+            category_bytes = {"user_files": 0, "app_files": 0, "system_files": 0, "recycle_bin": 0, "other": 0}
+            self._category_bytes = category_bytes
+            self._dup_candidate_count = dup_candidate_count
 
             # 1. Pindai Rekomendasi Pembersihan Cepat
             with self.lock:
                 self.status_text = "Memeriksa cache sistem & sisa instalasi..."
                 self.progress = 5
-            recommendations = self._collect_cleanup_recommendations(target_drives)
+            recommendations = self._collect_cleanup_recommendations(target_drives) if include_recommendations else []
+            self._register_allowed_paths(target_drives, recommendations)
 
             # 2. Pindai Berkas & Folder
             drives_count = len(target_drives)
@@ -281,8 +384,9 @@ class StorageManager:
                                 mtime = st.st_mtime
                                 self.files_scanned += 1
                                 self.bytes_scanned += sz
+                                category_bytes[self._classify_path(entry.path)] += sz
 
-                                if sz >= min_large_bytes:
+                                if sz >= min_large_bytes and len(large_items) < MAX_LARGE_ITEMS:
                                     large_items.append({
                                         "name": entry.name,
                                         "path": entry.path,
@@ -294,8 +398,12 @@ class StorageManager:
                                         "drive": drv["drive"],
                                         "age_days": int((now - mtime) / one_day)
                                     })
-                                if scan_duplicates and sz >= min_dup_bytes:  # Cek duplikat >= min_dup_bytes
-                                    size_candidates.setdefault(sz, []).append((entry.path, mtime))
+                                if scan_duplicates and sz >= min_dup_bytes:
+                                    if dup_candidate_count < MAX_DUP_CANDIDATES:
+                                        size_candidates.setdefault(sz, []).append((entry.path, mtime))
+                                        dup_candidate_count += 1
+                                    else:
+                                        self.scan_truncated = True
                             except (PermissionError, OSError):
                                 pass
 
@@ -324,6 +432,8 @@ class StorageManager:
             old_items.sort(key=lambda x: x["age_days"], reverse=True)
             top_old_items = old_items[:150]
 
+            self._register_result_paths(top_large_items, top_old_items, duplicates_result)
+
             # 5. Bangun Ringkasan Segmentasi (Mirip PC Manager: User, App, System, Other)
             summary = self._build_storage_summary(target_drives, recommendations, top_large_items)
 
@@ -339,6 +449,7 @@ class StorageManager:
                     "old_items": top_old_items,
                     "duplicates": duplicates_result,
                     "duplicate_groups": duplicates_result,
+                    "truncated": self.scan_truncated,
                     "timestamp": time.time(),
                     "formatted_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
@@ -352,9 +463,29 @@ class StorageManager:
                 self.progress = 100
                 self.is_scanning = False
 
+    def _classify_path(self, path):
+        low = os.path.normpath(path).lower()
+        if "\\$recycle.bin\\" in low or low.endswith("\\$recycle.bin"):
+            return "recycle_bin"
+        if "\\windows\\" in low or low.endswith("\\windows") or "\\system32\\" in low:
+            return "system_files"
+        if (
+            "\\program files" in low
+            or "\\appdata\\" in low
+            or "\\windowsapps\\" in low
+            or "\\programdata\\" in low
+        ):
+            return "app_files"
+        if "\\users\\" in low or low.endswith("\\users"):
+            return "user_files"
+        return "other"
+
     def _scan_directory_recursive(self, path, max_depth, current_depth, large_items, old_items, size_candidates, min_large_bytes, now, min_dup_bytes=512*1024):
         """Pemindaian rekursif terkontrol dengan proteksi loop junction point dan pembaruan telemetri."""
         if self.cancel_requested or current_depth > max_depth:
+            return 0, 0, 0
+        if self.files_scanned >= MAX_SCAN_FILES:
+            self.scan_truncated = True
             return 0, 0, 0
 
         total_size = 0
@@ -385,6 +516,7 @@ class StorageManager:
 
                             self.files_scanned += 1
                             self.bytes_scanned += sz
+                            self._category_bytes[self._classify_path(p)] += sz
                             if self.files_scanned % 500 == 0:
                                 with self.lock:
                                     self.current_path = p
@@ -392,7 +524,7 @@ class StorageManager:
                             age_days = int((now - mtime) / one_day)
 
                             # Catat berkas besar
-                            if sz >= min_large_bytes:
+                            if sz >= min_large_bytes and len(large_items) < MAX_LARGE_ITEMS:
                                 large_items.append({
                                     "name": entry.name,
                                     "path": p,
@@ -405,8 +537,8 @@ class StorageManager:
                                     "age_days": age_days
                                 })
 
-                            # Catat berkas lawas / jarang dipakai (> 90 hari)
-                            if age_days >= 30 and sz >= 1024:  # >= 1 KB dan >= 30 hari
+                            # Catat berkas lawas / jarang dipakai (> 30 hari)
+                            if age_days >= 30 and sz >= 1024 and len(old_items) < MAX_OLD_ITEMS:
                                 old_items.append({
                                     "name": entry.name,
                                     "path": p,
@@ -421,7 +553,11 @@ class StorageManager:
 
                             # Kandidat duplikat
                             if size_candidates is not None and sz >= min_dup_bytes:
-                                size_candidates.setdefault(sz, []).append((p, mtime))
+                                if self._dup_candidate_count < MAX_DUP_CANDIDATES:
+                                    size_candidates.setdefault(sz, []).append((p, mtime))
+                                    self._dup_candidate_count += 1
+                                else:
+                                    self.scan_truncated = True
 
                         except (PermissionError, OSError):
                             pass
@@ -476,9 +612,10 @@ class StorageManager:
                 return 0
 
         potential_groups.sort(key=_get_group_size, reverse=True)
-        # Batasi analisis ke 250 kelompok berkas teratas agar tidak membebani I/O
-        potential_groups = potential_groups[:250]
+        # Batasi analisis ke kelompok berkas teratas agar tidak membebani I/O
+        potential_groups = potential_groups[:MAX_DUP_GROUPS]
         total_groups = len(potential_groups)
+        hashed_bytes = 0
 
         app_logger.log_info("StorageManager", f"Menganalisis duplikat untuk {total_groups} kelompok kandidat berkas.")
 
@@ -523,10 +660,14 @@ class StorageManager:
                         if self.cancel_requested:
                             break
                         try:
+                            if hashed_bytes >= MAX_HASH_BYTES:
+                                self.scan_truncated = True
+                                break
                             hasher = hashlib.sha256()
                             with open(path, "rb") as f:
                                 while chunk := f.read(65536):
                                     hasher.update(chunk)
+                                    hashed_bytes += len(chunk)
                                     if self.cancel_requested:
                                         break
                             full_h = hasher.hexdigest()
@@ -578,6 +719,7 @@ class StorageManager:
                 "name": "NVIDIA Driver Update Artifacts",
                 "category": "Driver Cache",
                 "desc": "File mentahan installer pembaruan driver GPU NVIDIA yang sudah terpasang.",
+                "desc_en": "Raw installer files for NVIDIA GPU driver updates that are already installed.",
                 "path": os.path.join(program_data, r"NVIDIA Corporation\NVIDIA app\UpdateFramework\ota-artifacts\grd"),
                 "safe_level": "high",
                 "default_checked": True
@@ -587,6 +729,7 @@ class StorageManager:
                 "name": "UV Python Package Cache",
                 "category": "Dev Cache",
                 "desc": "Arsip cache paket Python astral-sh uv yang dapat diunduh ulang sewaktu-waktu.",
+                "desc_en": "Astral-sh uv Python package cache archives that can be downloaded again at any time.",
                 "path": os.path.join(local_app_data, r"uv\cache\archive-v0"),
                 "safe_level": "high",
                 "default_checked": True
@@ -596,6 +739,7 @@ class StorageManager:
                 "name": "Windows User Crash Dumps (.dmp)",
                 "category": "Crash Diagnostics",
                 "desc": "Berkas laporan crash aplikasi lama yang tidak lagi diperlukan.",
+                "desc_en": "Old application crash dump reports that are no longer needed.",
                 "path": os.path.join(local_app_data, "CrashDumps"),
                 "safe_level": "high",
                 "default_checked": True
@@ -605,6 +749,7 @@ class StorageManager:
                 "name": "NodeJS / NPM Tarball Cache",
                 "category": "Dev Cache",
                 "desc": "Cache unduhan modul package npm di direktori lokal pengguna.",
+                "desc_en": "Downloaded npm package tarballs in the local user cache.",
                 "path": os.path.join(local_app_data, "npm-cache"),
                 "safe_level": "high",
                 "default_checked": True
@@ -614,6 +759,7 @@ class StorageManager:
                 "name": "Python PIP Download Cache",
                 "category": "Dev Cache",
                 "desc": "Cache unduhan wheel/tarball instalasi pip Python.",
+                "desc_en": "Downloaded Python pip wheel/tarball installation cache.",
                 "path": os.path.join(local_app_data, r"pip\cache"),
                 "safe_level": "high",
                 "default_checked": True
@@ -623,6 +769,7 @@ class StorageManager:
                 "name": "Temporary User Files (%TEMP%)",
                 "category": "System Temp",
                 "desc": "Berkas sementara aplikasi yang sudah selesai dieksekusi.",
+                "desc_en": "Temporary application files that have already finished executing.",
                 "path": temp_dir,
                 "safe_level": "high",
                 "default_checked": True
@@ -632,6 +779,7 @@ class StorageManager:
                 "name": "Windows System Temp (C:\\Windows\\Temp)",
                 "category": "System Temp",
                 "desc": "Berkas sementara sistem operasi Windows.",
+                "desc_en": "Temporary files created by the Windows operating system.",
                 "path": r"C:\Windows\Temp",
                 "safe_level": "high",
                 "default_checked": True
@@ -641,6 +789,7 @@ class StorageManager:
                 "name": "DirectX Shader Cache (NVIDIA)",
                 "category": "GPU Cache",
                 "desc": "Shader DirectX yang dikompilasi game. Menghapus akan memicu kompilasi ulang saat game dibuka.",
+                "desc_en": "Game-compiled DirectX shaders. Deleting them triggers recompilation the next time a game starts.",
                 "path": os.path.join(local_app_data, r"NVIDIA\DXCache"),
                 "safe_level": "medium",
                 "default_checked": False
@@ -650,6 +799,7 @@ class StorageManager:
                 "name": "Google Chrome Web Cache",
                 "category": "Browser Cache",
                 "desc": "Cache gambar dan skrip situs web peramban Google Chrome.",
+                "desc_en": "Cached images and scripts from websites visited in Google Chrome.",
                 "path": os.path.join(local_app_data, r"Google\Chrome\User Data\Default\Cache"),
                 "safe_level": "medium",
                 "default_checked": False
@@ -659,18 +809,21 @@ class StorageManager:
                 "name": "Microsoft Edge Web Cache",
                 "category": "Browser Cache",
                 "desc": "Cache penjelajahan web peramban Microsoft Edge.",
+                "desc_en": "Cached web content from Microsoft Edge.",
                 "path": os.path.join(local_app_data, r"Microsoft\Edge\User Data\Default\Cache"),
                 "safe_level": "medium",
                 "default_checked": False
             },
             {
                 "id": "downloads_folder",
-                "name": "Berkas Unduhan Lama (> 30 Hari)",
+                "name": "Folder Unduhan (Inspeksi Manual)",
                 "category": "Downloads",
-                "desc": "Installer atau berkas di folder Downloads yang tidak dimodifikasi lebih dari 30 hari.",
+                "desc": "Folder pribadi. Aplikasi hanya menampilkan isinya untuk diperiksa; tidak ada penghapusan otomatis.",
+                "desc_en": "Personal folder. The app only lists its contents for inspection; nothing is deleted automatically.",
                 "path": os.path.join(user_profile, "Downloads"),
                 "safe_level": "manual",
-                "default_checked": False
+                "default_checked": False,
+                "selectable": False
             }
         ]
 
@@ -683,28 +836,33 @@ class StorageManager:
                     "name": f"Tempat Sampah (Recycle Bin {drv['drive']})",
                     "category": "Recycle Bin",
                     "desc": f"Berkas yang dihapus dan tersimpan di Recycle Bin drive {drv['drive']}.",
+                    "desc_en": f"Files deleted to the Recycle Bin on drive {drv['drive']}.",
                     "path": rb_path,
                     "safe_level": "high",
-                    "default_checked": True
+                    "default_checked": False,
+                    "clean_method": "recycle_bin"
                 })
 
         for item in check_targets:
             p = item["path"]
             if os.path.exists(p):
-                sz = self._calculate_path_size(p)
+                sz = self._calculate_path_size(p, time_budget=2.5)
                 if sz > 1024 * 1024:  # Minimal 1 MB agar relevan
                     item_copy = dict(item)
                     item_copy["size"] = sz
                     item_copy["size_formatted"] = format_bytes(sz)
                     item_copy["is_dir"] = os.path.isdir(p)
+                    item_copy["description"] = item["desc"]
+                    item_copy["selectable"] = item.get("selectable", True)
+                    item_copy["safe_to_delete"] = item_copy["selectable"] and item.get("default_checked", False)
                     recommendations.append(item_copy)
 
         # Urutkan berdasarkan ukuran terbesar
         recommendations.sort(key=lambda x: x["size"], reverse=True)
         return recommendations
 
-    def _calculate_path_size(self, path):
-        """Menghitung total ukuran berkas atau direktori tanpa loop junction."""
+    def _calculate_path_size(self, path, time_budget=MAX_RECOMMENDATION_WALK_SECONDS, _deadline=None, _depth=0):
+        """Menghitung ukuran direktori dengan batas waktu & kedalaman agar responsif."""
         if not os.path.exists(path):
             return 0
         if os.path.isfile(path):
@@ -712,11 +870,19 @@ class StorageManager:
                 return os.path.getsize(path)
             except Exception:
                 return 0
+        if _deadline is None:
+            _deadline = time.time() + time_budget
+        if _depth > 12 or self.cancel_requested or time.time() > _deadline:
+            self.scan_truncated = True
+            return 0
 
         total = 0
         try:
             with os.scandir(path) as it:
                 for entry in it:
+                    if self.cancel_requested or time.time() > _deadline:
+                        self.scan_truncated = True
+                        break
                     if is_reparse_point(entry):
                         continue
                     if entry.is_file(follow_symlinks=False):
@@ -725,44 +891,83 @@ class StorageManager:
                         except Exception:
                             pass
                     elif entry.is_dir(follow_symlinks=False):
-                        total += self._calculate_path_size(entry.path)
+                        total += self._calculate_path_size(
+                            entry.path,
+                            time_budget=time_budget,
+                            _deadline=_deadline,
+                            _depth=_depth + 1,
+                        )
         except Exception:
             pass
         return total
 
+    def _register_allowed_paths(self, target_drives, recommendations):
+        with self.lock:
+            self.allowed_clean_roots = set()
+            self.allowed_clean_files = set()
+            self.allowed_inspect_roots = set()
+            self.allowed_recycle_roots = set()
+            for drv in target_drives:
+                self.allowed_inspect_roots.add(_norm_path(drv["root"]))
+            for rec in recommendations:
+                normalized = _norm_path(rec["path"])
+                self.allowed_inspect_roots.add(normalized)
+                if rec.get("selectable", True):
+                    self.allowed_clean_roots.add(normalized)
+                    if rec.get("clean_method") == "recycle_bin":
+                        self.allowed_recycle_roots.add(normalized)
+
+    def _register_result_paths(self, large_items, old_items, duplicates):
+        with self.lock:
+            for item in list(large_items) + list(old_items):
+                path = item.get("path")
+                if not path:
+                    continue
+                if item.get("is_dir"):
+                    self.allowed_inspect_roots.add(_norm_path(path))
+                elif not _is_system_managed_path(path):
+                    self.allowed_clean_files.add(_norm_path(path))
+            for group in duplicates:
+                for file_info in group.get("files", []):
+                    path = file_info.get("path")
+                    if path:
+                        self.allowed_clean_files.add(_norm_path(path))
+
+    def _is_inspect_allowed(self, path):
+        normalized = _norm_path(path)
+        for root in self.allowed_inspect_roots:
+            if _is_within(normalized, root):
+                return True
+        return False
+
     def _build_storage_summary(self, target_drives, recommendations, large_items):
-        """Membangun data segmentasi kapasitas storage (User, Apps, System, Recycle Bin, Other)."""
+        """
+        Membangun segmentasi kapasitas dari byte yang benar-benar dipindai.
+        Tidak ada estimasi proporsional: sisa kapasitas yang belum dipindai
+        dilaporkan sebagai 'Belum terklasifikasi'.
+        """
         total_used = sum(d["used"] for d in target_drives)
         total_size = sum(d["total"] for d in target_drives)
         total_free = sum(d["free"] for d in target_drives)
 
-        # Hitung ukuran per kategori
-        recycle_size = sum(r["size"] for r in recommendations if r["category"] == "Recycle Bin")
-        cache_size = sum(r["size"] for r in recommendations if r["category"] in ("Driver Cache", "Dev Cache", "System Temp", "GPU Cache", "Browser Cache"))
-        
-        # Estimasi breakdown
-        app_size = 0
-        user_size = 0
-        system_size = 0
-
-        for itm in large_items:
-            p = itm["path"].lower()
-            if "program files" in p or "appdata" in p or "windowsapps" in p:
-                app_size += itm["size"]
-            elif "windows" in p or "system32" in p:
-                system_size += itm["size"]
-            elif "users" in p:
-                user_size += itm["size"]
-
-        # Default fallback reasonable estimates jika scanning terbatas
-        if app_size == 0 and total_used > 0:
-            app_size = int(total_used * 0.35)
-        if user_size == 0 and total_used > 0:
-            user_size = int(total_used * 0.25)
-        if system_size == 0 and total_used > 0:
-            system_size = int(total_used * 0.20)
-
+        measured = dict(getattr(self, "_category_bytes", {}) or {})
+        user_size = int(measured.get("user_files", 0))
+        app_size = int(measured.get("app_files", 0))
+        system_size = int(measured.get("system_files", 0))
+        recycle_size = int(measured.get("recycle_bin", 0))
+        measured_total = user_size + app_size + system_size + recycle_size + int(measured.get("other", 0))
         other_size = max(0, total_used - (user_size + app_size + system_size + recycle_size))
+        coverage = round((min(measured_total, total_used) / total_used) * 100, 1) if total_used > 0 else 0
+
+        categories = [
+            {"name": "User Files", "key": "user", "size": user_size, "size_formatted": format_bytes(user_size), "color": "#EF4444"},
+            {"name": "Application Files", "key": "app", "size": app_size, "size_formatted": format_bytes(app_size), "color": "#F59E0B"},
+            {"name": "System Files", "key": "system", "size": system_size, "size_formatted": format_bytes(system_size), "color": "#3B82F6"},
+            {"name": "Recycle Bin", "key": "recycle", "size": recycle_size, "size_formatted": format_bytes(recycle_size), "color": "#10B981"},
+            {"name": "Other / Unclassified", "key": "other", "size": other_size, "size_formatted": format_bytes(other_size), "color": "#6B7280"},
+        ]
+
+        cleanable = sum(r["size"] for r in recommendations if r.get("default_checked") and r.get("selectable", True))
 
         return {
             "total_size": total_size,
@@ -772,21 +977,24 @@ class StorageManager:
             "total_free": total_free,
             "total_free_formatted": format_bytes(total_free),
             "percent_used": round((total_used / total_size) * 100, 1) if total_size > 0 else 0,
-            "categories": [
-                {"name": "User Files", "key": "user", "size": user_size, "size_formatted": format_bytes(user_size), "color": "#EF4444"},
-                {"name": "Application Files", "key": "app", "size": app_size, "size_formatted": format_bytes(app_size), "color": "#F59E0B"},
-                {"name": "System Files", "key": "system", "size": system_size, "size_formatted": format_bytes(system_size), "color": "#3B82F6"},
-                {"name": "Recycle Bin", "key": "recycle", "size": recycle_size, "size_formatted": format_bytes(recycle_size), "color": "#10B981"},
-                {"name": "Other / Caches", "key": "other", "size": other_size, "size_formatted": format_bytes(other_size), "color": "#6B7280"}
-            ],
-            "recommendations_cleanable": sum(r["size"] for r in recommendations if r.get("default_checked")),
-            "recommendations_cleanable_formatted": format_bytes(sum(r["size"] for r in recommendations if r.get("default_checked")))
+            "measured_bytes": measured_total,
+            "measured_bytes_formatted": format_bytes(measured_total),
+            "coverage_pct": coverage,
+            "user_files": user_size,
+            "app_files": app_size,
+            "system_files": system_size,
+            "recycle_bin": recycle_size,
+            "other": other_size,
+            "categories": categories,
+            "recommendations_cleanable": cleanable,
+            "recommendations_cleanable_formatted": format_bytes(cleanable),
+            "truncated": self.scan_truncated,
         }
 
-    def inspect_directory(self, path, limit=100):
+    def inspect_directory(self, path, limit=100, enforce_allowlist=True):
         """
         Memeriksa dan mendaftar berkas-berkas di dalam folder tertentu.
-        Mengembalikan daftar item berurutan dari yang terbesar beserta metadata penting.
+        Path hanya boleh berasal dari hasil pemindaian terakhir saat dipanggil via API.
         """
         if not path or not os.path.exists(path):
             return {"success": False, "error": "Direktori tidak ditemukan atau tidak dapat diakses."}
@@ -794,14 +1002,21 @@ class StorageManager:
         if not os.path.isdir(path):
             return {"success": False, "error": "Jalur yang diberikan bukan direktori."}
 
+        if enforce_allowlist and not self._is_inspect_allowed(path):
+            return {"success": False, "error": "Folder ini tidak termasuk hasil pemindaian yang diizinkan."}
+
         try:
             items = []
             total_files = 0
             total_dirs = 0
             total_bytes = 0
+            truncated = False
 
             with os.scandir(path) as it:
                 for entry in it:
+                    if len(items) >= MAX_INSPECT_ITEMS:
+                        truncated = True
+                        break
                     try:
                         is_dir = entry.is_dir(follow_symlinks=False)
                         st = entry.stat(follow_symlinks=False)
@@ -841,10 +1056,88 @@ class StorageManager:
                 "total_dirs": total_dirs,
                 "total_bytes": total_bytes,
                 "total_bytes_formatted": format_bytes(total_bytes),
-                "items": items[:limit]
+                "items": items[:max(1, min(int(limit), 500))],
+                "truncated": truncated,
             }
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+
+    def open_in_explorer(self, target_path):
+        if not isinstance(target_path, str) or not target_path.strip():
+            return False, "Path tidak valid."
+        if not self._is_inspect_allowed(target_path):
+            return False, "Path tidak termasuk hasil pemindaian yang diizinkan."
+        return open_in_explorer(target_path)
+
+    def clean_paths(self, paths_to_clean):
+        """Validasi path terhadap hasil pemindaian, lalu hapus hanya item yang diizinkan."""
+        if not isinstance(paths_to_clean, list):
+            return {"success": False, "error": "Daftar path tidak valid."}
+
+        selected = []
+        recycle_targets = []
+        rejected = []
+
+        with self.lock:
+            allowed_files = set(self.allowed_clean_files)
+            allowed_roots = set(self.allowed_clean_roots)
+            recycle_roots = set(self.allowed_recycle_roots)
+
+        for raw_path in paths_to_clean:
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                rejected.append({"path": str(raw_path), "reason": "Path kosong/tidak valid"})
+                continue
+
+            normalized = _norm_path(raw_path)
+            if normalized in allowed_files and os.path.isfile(raw_path):
+                if _is_system_managed_path(raw_path):
+                    rejected.append({"path": raw_path, "reason": "Berkas sistem/aplikasi dilindungi"})
+                else:
+                    selected.append(raw_path)
+                continue
+
+            matching_root = None
+            for root in allowed_roots:
+                if _is_within(normalized, root):
+                    matching_root = root
+                    break
+            if matching_root is None:
+                rejected.append({"path": raw_path, "reason": "Tidak termasuk hasil pemindaian"})
+                continue
+
+            if _is_protected_dir(raw_path):
+                rejected.append({"path": raw_path, "reason": "Direktori sistem dilindungi"})
+                continue
+
+            if matching_root in recycle_roots:
+                recycle_targets.append(raw_path)
+                continue
+
+            selected.append(raw_path)
+
+        result = execute_cleanup(selected)
+
+        for rb_path in recycle_targets:
+            drive, _ = os.path.splitdrive(os.path.abspath(rb_path))
+            letter = drive[:1].upper()
+            if not letter.isalpha():
+                result["errors"].append(f"{rb_path}: huruf drive tidak valid")
+                continue
+            before = self._calculate_path_size(rb_path, time_budget=2.0)
+            ok, output = clear_recycle_bin(letter)
+            if ok:
+                result["freed_bytes"] += before
+                result["deleted_count"] += 1
+            else:
+                result["errors"].append(f"Recycle Bin {letter}: {output}")
+
+        result["freed_formatted"] = format_bytes(result["freed_bytes"])
+        result["reclaimed_formatted"] = result["freed_formatted"]
+        result["rejected"] = rejected
+        if rejected:
+            app_logger.log_warn("StorageManager", f"Rejected cleanup paths: {len(rejected)}")
+        return result
 
 
 def inspect_directory(path, limit=100):
@@ -876,16 +1169,46 @@ def open_in_explorer(target_path):
         if os.name == "nt":
             creationflags = 0x08000000  # CREATE_NO_WINDOW
             if os.path.isfile(norm_path):
-                cmd = f'explorer.exe /select,"{norm_path}"'
+                subprocess.Popen(
+                    ["explorer.exe", f"/select,{norm_path}"],
+                    shell=False,
+                    creationflags=creationflags,
+                )
             else:
-                cmd = f'explorer.exe "{norm_path}"'
-            subprocess.Popen(cmd, shell=True, creationflags=creationflags)
+                subprocess.Popen(
+                    ["explorer.exe", norm_path],
+                    shell=False,
+                    creationflags=creationflags,
+                )
             return True, "Berhasil membuka File Explorer."
         else:
             # Fallback untuk pengujian non-Windows
             return True, f"Simulasi membuka: {norm_path}"
     except Exception as e:
         return False, f"Gagal membuka File Explorer: {e}"
+
+
+def clear_recycle_bin(drive_letter):
+    """Kosongkan Recycle Bin lewat Shell API (bukan menghapus mentah $Recycle.Bin)."""
+    clean_letter = (drive_letter or "").strip().upper().replace(":", "")
+    if len(clean_letter) != 1 or not clean_letter.isalpha():
+        return False, "Huruf drive tidak valid."
+    try:
+        cmd = (
+            f"$ErrorActionPreference='Stop'; "
+            f"Clear-RecycleBin -DriveLetter {clean_letter} -Force"
+        )
+        p = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            creationflags=0x08000000 if os.name == "nt" else 0,
+        )
+        output = (p.stdout + "\n" + p.stderr).strip()
+        return p.returncode == 0, output or "Recycle Bin dikosongkan."
+    except Exception as e:
+        return False, str(e)
 
 
 def execute_cleanup(paths_to_clean):
@@ -899,6 +1222,9 @@ def execute_cleanup(paths_to_clean):
 
     for item_path in paths_to_clean:
         if not os.path.exists(item_path):
+            continue
+        if _is_protected_dir(item_path):
+            errors.append(f"{os.path.basename(item_path)}: direktori sistem dilindungi")
             continue
 
         try:
@@ -932,6 +1258,8 @@ def execute_cleanup(paths_to_clean):
         "success": True,
         "freed_bytes": freed_bytes,
         "freed_formatted": format_bytes(freed_bytes),
+        "reclaimed_formatted": format_bytes(freed_bytes),
         "deleted_count": deleted_count,
-        "errors": errors
+        "errors": errors,
+        "rejected": [],
     }

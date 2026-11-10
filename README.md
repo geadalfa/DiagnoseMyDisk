@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="static/icon-512.png" alt="DiagnoseMyDisk Logo" width="128" height="128">
+  <img src="docs/banner.svg" alt="DiagnoseMyDisk — evidence-based storage diagnostics for Windows" width="100%">
 </p>
 
 <h1 align="center">DiagnoseMyDisk</h1>
@@ -13,12 +13,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Release-v2.1.1-emerald.svg?logo=github&logoColor=white" alt="Release v2.1.1"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Version-v3.0.0-emerald.svg?logo=github&logoColor=white" alt="Version v3.0.0"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
   <a href="#-privacy-guarantee-we-do-not-collect-data"><img src="https://img.shields.io/badge/Privacy-100%25%20UU%20PDP%20Compliant-blue.svg?logo=shield&logoColor=white" alt="UU PDP Compliant"></a>
   <a href="#-privacy-guarantee-we-do-not-collect-data"><img src="https://img.shields.io/badge/Zero--Telemetry-No%20Data%20Collected-10b981.svg" alt="Zero Telemetry"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-CC%20BY--NC%204.0%20(Non--Commercial)-lightgrey.svg" alt="License: CC BY-NC 4.0"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/tree/main/tests"><img src="https://img.shields.io/badge/Tests-52%20passing-10b981.svg" alt="52 tests passing"></a>
+  <a href="#security-model-v300"><img src="https://img.shields.io/badge/API-127.0.0.1%20only-2563EB.svg" alt="Local API only"></a>
 </p>
 
 ---
@@ -35,18 +37,78 @@
 
 > **DiagnoseMyDisk** is an advanced Windows storage diagnostic and disk management utility for Windows 10 & 11. It unmasks manufacturer firmware normalization (*False 100% Good* reports), evaluates physical hardware degradation (*True Health*) across NVMe, SATA SSDs, and mechanical HDDs, maps storage block degradation (*Surface LBA Map*), repairs file system volumes (*Drive Doctor*), provides segmented capacity analysis (*PC Manager Style*), identifies duplicate files via *SHA-256*, and offers **Interactive Folder Inspection** and **Live Diagnostic Logging** through a high-contrast **Anti-Slop Zinc** desktop interface.
 
+### Built for people who don't trust "100% Good"
+
+A drive can report `Current = 100` while its raw registers show worn NAND cells, reallocated sectors, or a depleted spare pool. DiagnoseMyDisk reads the evidence, shows where every number came from, and says `N/A` when the evidence is missing. No cloud account, no telemetry, no invented telemetry.
+
+| What makes it different | Why it matters |
+| :--- | :--- |
+| **Evidence-first health engine** | Health is derived from raw S.M.A.R.T registers and NVMe `Percentage Used`; unavailable values stay unavailable. |
+| **Provenance on every disk** | `LIVE WMI`, `CDI CACHE`, or `UNAVAILABLE` tells you whether a reading is live, historical, or absent. |
+| **Local-only attack surface** | API token, Host/Origin checks, path allowlists, and body caps on a loopback-only server. |
+| **Measured, not guessed** | Storage categories use bytes actually scanned; the app reports coverage instead of filling the chart with estimates. |
+| **Honest cleanup** | Recommendations are explicit, manual folders stay manual, and protected system paths are rejected server-side. |
+
 ---
 
-## Download & Install (v2.1.1)
+## v3.0.0 at a Glance
+
+| Area | v3.0.0 |
+| :--- | :--- |
+| **Security** | Per-launch API token · Host/Origin validation · no wildcard CORS · path allowlists · command-injection guards |
+| **Data honesty** | Source labels · data-gap lists · `N/A` for missing values · no fabricated temperatures, POH, NVMe counters, or health percentages |
+| **Storage** | Measured category breakdown · duplicate hashing budgets · scan caps · reload-safe watchdog · Shell-based Recycle Bin cleanup |
+| **UI** | Fixed storage wiring · empty/loading states · diagnostic HTML export · toasts · keyboard focus · NVMe-aware temperature thresholds |
+| **Quality** | 52 automated tests · security regression tests · performance guardrails · real-hardware browser QA |
+
+---
+
+## Verified on Real Hardware
+
+Measured on the author's Windows 11 workstation (4 physical drives: NVMe, 2× SATA SSD, SMR HDD):
+
+| Check | Result |
+| :--- | :--- |
+| Full `C:` storage scan | **24,106 files** in **~16 seconds** |
+| Duplicate analysis | **131 duplicate groups** identified |
+| Recommendations / large items / old items | 10 / 150 / 150 |
+| Cached telemetry API latency | **~1.1 ms average** (5-run local benchmark) |
+| Test suite | **52/52 passing** (unit, integration, security, performance) |
+| Browser QA | 4 disks, 30 S.M.A.R.T rows, 200 surface blocks, folder expansion, filters, duplicate selection, logs, export, language/theme, reload survival |
+| Network audit | Every request stayed on `127.0.0.1` |
+
+These are reproducible checks, not marketing estimates. Hardware readings vary by drive and privilege level; that is exactly why the app exposes provenance and data gaps.
+
+---
+
+## v3.0.0 Overhaul Highlights
+
+- **Local API hardening:** every API request now requires a per-launch session token; `Host` and `Origin` are validated, wildcard CORS is removed, request bodies are capped, and JSON/security headers are enforced. Reloading the window no longer kills the backend.
+- **Destructive-action allowlists:** cleanup, folder inspection, and Explorer opening are limited to paths that appeared in the last scan. Drive roots, protected system directories, and files under Windows/Program Files/ProgramData are rejected. Recycle Bin is emptied through the Shell API instead of deleting raw `$Recycle.Bin` contents.
+- **No invented telemetry:** removed hardcoded health percentages, fake NVMe counters, fixed temperatures, and model-specific fallback values. Every disk now carries a provenance label (`LIVE WMI`, `CDI CACHE`, or `UNAVAILABLE`) and an explicit data-gap list. Missing values render as `N/A`.
+- **Measured storage breakdown:** category sizes are measured from bytes actually scanned; unscanned capacity is labelled `Other / unclassified`. The previous proportional 45/30/15/2/8 split is gone.
+- **Correct storage UI:** fixed broken element IDs, filter handlers, duplicate auto-selection, recommendation defaults, cleanup result fields, and added explicit empty/loading states plus a diagnostic HTML export.
+- **Performance:** bounded scan file counts, duplicate candidate limits, hashing byte budget, recommendation walk timeouts, cached disk geometry, and path-inspection limits. A real 24k-file C: scan completed in ~16 seconds on the test machine.
+- **Offline integrity:** removed the remaining Google Fonts import; all requests stay on `127.0.0.1`.
+
+---
+
+## Download & Install (v3.0.0)
 
 Standalone executables for Windows 10 & 11 (64-bit):
 
 | Distribution Package | Description | Direct Download |
 | :--- | :--- | :--- |
-| **Windows Installer (.EXE)** *(Recommended)* | Automated installation to local AppData, desktop and start menu shortcuts. Does not require Administrator privileges. | [**Download DiagnoseMyDisk_Setup.exe (v2.1.1)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v2.1.1/DiagnoseMyDisk_Setup.exe) |
-| **Portable Archive (.ZIP)** | Standalone portable bundle. Extract and run `DiagnoseMyDisk.exe` without installation. | [**Download DiagnoseMyDisk-v2.1.1-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v2.1.1/DiagnoseMyDisk-v2.1.1-portable.zip) |
+| **Windows Installer (.EXE)** *(Recommended)* | Automated installation to local AppData, Start Menu and optional desktop shortcut. Runs without installer-time Administrator rights. | [**Download DiagnoseMyDisk_Setup.exe (v3.0.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/DiagnoseMyDisk_Setup.exe) |
+| **Portable Archive (.ZIP)** | Standalone portable bundle. Extract and run `DiagnoseMyDisk.exe` without installation. | [**Download DiagnoseMyDisk-v3.0.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/DiagnoseMyDisk-v3.0.0-portable.zip) |
+| **Checksums** | SHA-256 for both release assets. Verify before running. | [**Download SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/SHA256SUMS.txt) |
 
-All official releases and commit histories are accessible on [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases).
+```text
+b4d5bd690d0027e84d84b2efb47b67c79b734b5541734537ee748bfea08b243e  DiagnoseMyDisk_Setup.exe
+2bf2ac19e03196d43d5cd1485a0041870b4acdfe4d0304e00e9dcbc8ce45cf54  DiagnoseMyDisk-v3.0.0-portable.zip
+```
+
+All official releases and commit histories are accessible on [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases). The application requires Windows 10/11 x64 and opens in a dedicated Edge/Chrome app window on `127.0.0.1:5550`.
 
 ---
 
@@ -55,7 +117,7 @@ All official releases and commit histories are accessible on [GitHub Releases](h
 | Category | Capability | Subsystem | Technical Specifications | Status |
 | :--- | :--- | :--- | :--- | :---: |
 | **Folder Inspection** | **Interactive Folder Expansion** *(v2.1.0)* | `backend/storage_manager.py` & UI | Click on any recommended folder (GPU Cache, Downloads, Browser Cache, Large Folders) to reveal its contents directly in the UI, sorted by file size descending, with modification dates and direct Explorer shortcuts. | ✅ `ACTIVE` |
-| **Preferences & i18n** | **Default English & Dual-Tier Persistence** *(v2.1.1)* | `server.py` & `static/app.js` | Defaults to English on fresh profile initialization. Persists language selections across sessions using instant synchronous `localStorage` and durable server profile storage (`user_preferences.json`). | ✅ `ACTIVE` |
+| **Preferences & i18n** | **Default English & Dual-Tier Persistence** *(v3.0.0)* | `server.py` & `static/app.js` | Defaults to English on fresh profile initialization. Persists language selections across sessions using instant synchronous `localStorage` and durable server profile storage (`user_preferences.json`). | ✅ `ACTIVE` |
 | **Diagnostic Logging** | **Live Telemetry & Diagnostic Console** | `backend/app_logger.py` & UI | Dual logging engine: persistent file logging (`diagnose_my_disk.log`) and 1000-line in-memory ring buffer with live polling, clipboard copy, and direct Notepad launch. | ✅ `ACTIVE` |
 | **Storage Allocation** | **Segmented Storage Analyzer** | `backend/storage_manager.py` & UI | PC Manager-style segmented bar representing capacity distribution: User Files, Applications, Windows System, Recycle Bin, and Other/Caches. | ✅ `ACTIVE` |
 | | **Two-Tier Duplicate File Detection** | `backend/storage_manager.py` | Tier 1: exact file size matching and 4KB MD5 header hash; Tier 2: full SHA-256 verification with automatic exclusion of protected system directories (`WindowsApps`, `C:\Windows`). | ✅ `ACTIVE` |
@@ -63,14 +125,15 @@ All official releases and commit histories are accessible on [GitHub Releases](h
 | **Surface & Repair** | **Bad Sector Surface LBA Map** | `backend/scanner.py` & UI | Non-destructive scanning of 200 physical disk blocks with 512-byte sector-aligned I/O, latency benchmarking (ms), and visual health classification. | ✅ `ACTIVE` |
 | | **Drive Doctor (CHKDSK & TRIM)** | `backend/scanner.py` & UI | Dispatches Windows volume metadata verification (`Repair-Volume`), NAND cell maintenance (`ReTrim`), and Dirty Bit evaluation. | ✅ `ACTIVE` |
 | **Health Analytics** | **Firmware Masking Filter** | `backend/smart_decoder.py` | Ignores static manufacturer `Current 100` readings. Computes wear directly from vendor registers (`0xA9`, `0x05`, `0xA6`, `0xE8`). | ✅ `ACTIVE` |
-| | **NVMe 2.0 True Health Engine** | `backend/smart_decoder.py` | Complies with NVM Express 2.0 Log Page 02h: evaluates `Percentage Used`, `Available Spare`, and `Media Integrity Errors`. | ✅ `ACTIVE` |
+| | **NVMe 2.0 True Health Engine** | `backend/smart_decoder.py` | Complies with NVM Express 2.0 Log Page 02h: evaluates `Percentage Used` and `Available Spare` when exposed. Missing fields are reported as `N/A`, with provenance and data-gap notes. | ✅ `ACTIVE` |
 | | **Write Amplification (WAF)** | `backend/smart_decoder.py` | Calculates ratio of host data writes against physical NAND cell writes (`HostWrites` vs `NandWrites`). | ✅ `ACTIVE` |
-| **Telemetry Cascade** | **Multi-Tier Collector** | `backend/collector.py` | **Tier 1:** Live non-blocking CIM WMI query.<br>**Tier 2:** Hardware cache parser (`Smart.ini` / CDI database).<br>**Tier 3:** Deterministic local cache reconstruction (0.01s). | ✅ `ACTIVE` |
+| **Telemetry Cascade** | **Multi-Tier Collector** | `backend/collector.py` | **Tier 1:** Live non-blocking CIM WMI query.<br>**Tier 2:** Hardware cache parser (`Smart.ini` / CDI database).<br>**Tier 3:** Local cache fallback with explicit provenance. Missing values stay `N/A`; no synthetic reconstruction. | ✅ `ACTIVE` |
 | | **Zero Blank Screen Guarantee** | `backend/collector.py` | Ensures drive listings are never blank. If WMI queries time out, system reconstructs drive profiles from local hardware cache. | ✅ `ACTIVE` |
 | | **Partition & Drive Letter Mapping** | `backend/collector.py` | Automatically associates physical storage devices with logical drive letters (`C:`, `D:`, `E:`, ... Drive N) with real-time capacity checks. | ✅ `ACTIVE` |
 | **Runtime & Network** | **Zero-CDN Offline Operation** | `static/` | Tailwind CSS and Lucide vector icons are bundled locally (`tailwind.min.js`, `lucide.min.js`). Operates completely without internet access. | ✅ `ACTIVE` |
 | | **Direct IPv4 Socket** | `server.py` | Binds directly to `127.0.0.1:5550`, eliminating Windows IPv6 `[::1]` resolution latency. | ✅ `ACTIVE` |
-| | **Watchdog & Clean Auto-Shutdown** | `server.py` & `static/app.js` | Heartbeat polling (2.5s) and `navigator.sendBeacon('/api/shutdown')` ensure the backend exits cleanly when the desktop window closes. | ✅ `ACTIVE` |
+| | **Watchdog & Clean Auto-Shutdown** | `server.py` & `static/app.js` | Heartbeat polling (2.5s) drives a watchdog that exits only after the heartbeat stops. Reloading the page no longer kills the backend. | ✅ `ACTIVE` |
+| **Local Security** | **Token + Path Allowlist Hardening** *(v3.0.0)* | `server.py` & `backend/storage_manager.py` | Per-launch API token, Host/Origin checks, no wildcard CORS, body caps, protected-tree rejection, and command-injection guards on repair actions. | ✅ `ACTIVE` |
 | **UI/UX Design** | **Anti-Slop Desktop Shell** | `static/index.html` & `style.css` | Fixed desktop viewport (`h-screen overflow-hidden`), neutral Zinc design tokens (OKLCH), tabular numeric alignment (`tabular-nums`), high-contrast dark mode. | ✅ `ACTIVE` |
 | | **7-Column Forensic S.M.A.R.T Table** | `static/app.js` | Displays Condition (3D spheres), Hex ID, Attribute Name, Current, Worst, Manufacturer Threshold, and Raw Hex/Dec values. | ✅ `ACTIVE` |
 | | **Instant Bilingual Switching (EN / ID)** | `static/app.js` | Real-time language switching without page reloads or interface flashes. | ✅ `ACTIVE` |
@@ -172,11 +235,14 @@ DiagnoseMyDisk/
 ├── backend/
 │   ├── __init__.py           # Package initializer
 │   ├── app_logger.py         # Dual logging engine (Persistent File + In-Memory Ring Buffer)
+│   ├── health_engine.py      # Evidence-only SATA/NVMe/HDD health evaluation (no fabricated values)
 │   ├── collector.py          # Multi-tier telemetry collector (WMI + Hardware Cache + Reconstruction)
 │   ├── hardware_profile.py   # Storage controller profiler & NAND flash architecture guide
 │   ├── scanner.py            # Bad Sector surface LBA scanner & Drive Doctor repair
 │   ├── smart_decoder.py      # S.M.A.R.T raw register decoder, thresholds & True Health engine
 │   └── storage_manager.py    # Multi-drive storage analyzer, duplicate finder & interactive folder inspector
+├── docs/
+│   └── banner.svg            # README promo banner (offline vector, no external assets)
 ├── static/
 │   ├── app.js                # Anti-slop frontend controller, bilingual i18n & folder expansion
 │   ├── index.html            # Contained desktop shell layout (Zinc palette, high information density)
@@ -187,11 +253,13 @@ DiagnoseMyDisk/
 │   ├── favicon.ico           # Application icon
 │   └── icon-*.png            # High-resolution raster icons (16px, 32px, 192px, 512px)
 ├── tests/
-│   ├── test_server_routes.py # Integration QA test suite for HTTP API endpoints & preferences
-│   └── test_storage_manager.py # Unit test suite for storage engine, duplicates & folder inspector
+│   ├── test_server_routes.py # Integration + security QA for HTTP API, token, Host/Origin and path guards
+│   ├── test_health_engine.py # Health engine honesty tests (unknown states, no invented telemetry)
+│   ├── test_performance.py   # Scan/API performance guardrails
+│   └── test_storage_manager.py # Storage engine, measured summaries, allowlists & folder inspector
 ├── app_icon.ico              # Windows PE executable icon
 ├── DiagnoseMyDisk.spec       # PyInstaller build specification (Clean standalone bundle)
-├── installer.iss             # Inno Setup Windows installer script (v2.1.1)
+├── installer.iss             # Inno Setup Windows installer script (v3.0.0)
 ├── release.py                # Automated GitHub release & asset deployment runner
 ├── server.py                 # Multi-threaded server, IPv4 direct routing, watchdog & preferences
 ├── run.bat                   # Quick development launcher
@@ -245,7 +313,70 @@ iscc installer.iss
 ```powershell
 python -m unittest discover tests
 ```
-*All 15 test suites must pass with exit code 0.*
+*All 52 test suites must pass with exit code 0.*
+
+---
+
+## Security Model (v3.0.0)
+
+DiagnoseMyDisk is a **local desktop utility**, but it still treats its loopback API as an attack surface.
+
+| Control | Implementation |
+| :--- | :--- |
+| **Session token** | A random token is generated per launch, injected into the page, and required on every `/api/*` request. |
+| **Host / Origin validation** | Requests with a foreign `Host` or cross-site `Origin` are rejected with HTTP 403. |
+| **No wildcard CORS** | `Access-Control-Allow-Origin: *` has been removed; browser SOP and token checks work together. |
+| **Path allowlists** | Cleanup, folder inspection, and Explorer opening are limited to paths discovered by the last scan. |
+| **Protected trees** | Drive roots, `Windows`, `Program Files`, `ProgramData`, and `Users` roots are rejected server-side. |
+| **Command-injection guards** | Repair endpoints accept only a single drive letter after regex validation. |
+| **Request caps** | JSON bodies are capped at 1 MB; scan chunk sizes and block counts are clamped. |
+| **Headers** | CSP, `X-Content-Type-Options`, `X-Frame-Options: DENY`, and `Referrer-Policy: no-referrer` are sent with responses. |
+| **Reload safety** | Reloading the UI no longer sends a shutdown signal; the watchdog exits only after the heartbeat actually stops. |
+
+If you find a security issue, please open a private report through GitHub Security Advisories or contact the author before publishing details.
+
+---
+
+## FAQ
+
+**Does DiagnoseMyDisk upload my disk data?**  
+No. All runtime traffic is bound to `127.0.0.1`; the browser network audit in QA shows only local requests.
+
+**Why do some values show `N/A`?**  
+Because the app refuses to invent telemetry. Run as Administrator, attach the drive, or use a valid local telemetry cache to improve coverage.
+
+**Why does the health percentage differ from CrystalDiskInfo?**  
+The app computes *True Health* from raw registers and flags firmware-locked `Current` values. It also labels cached CDI data as historical, not live.
+
+**Can it delete my files automatically?**  
+No. Cleanup requires explicit selection and confirmation, runs only against last-scan allowlists, and refuses protected system paths.
+
+**Does it work offline?**  
+Yes. Tailwind, Lucide, icons, and styles are bundled locally; the remaining Google Fonts dependency was removed in v3.0.0.
+
+---
+
+## Roadmap
+
+- Optional persistent scan summaries (opt-in, local-only) for trend comparison between sessions.
+- Vendor-specific NVMe log-page decoding where Windows exposes it.
+- Signed release binaries and reproducible build attestations.
+- Additional accessibility and localization coverage for every storage label.
+
+---
+
+## Contributing & Support
+
+- **Star the repo** if the project is useful — it helps other Windows users find an honest diagnostic tool.
+- Open an issue with the exact drive model, bus type, Windows build, and the relevant diagnostic log (redact serial numbers if needed).
+- Pull requests are welcome for decoder rules, UI polish, tests, and documentation. Please keep the **no fabricated telemetry** invariant intact.
+- Share it with someone who has been told “your SSD is 100% healthy” while it is actually retiring blocks.
+
+<p align="center">
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/stargazers"><img src="https://img.shields.io/github/stars/geadalfa/DiagnoseMyDisk?style=social" alt="GitHub stars"></a>
+  &nbsp;
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases/latest"><img src="https://img.shields.io/github/v/release/geadalfa/DiagnoseMyDisk?display_name=tag" alt="Latest release"></a>
+</p>
 
 ---
 
@@ -296,27 +427,42 @@ Distributed under the **Creative Commons Attribution-NonCommercial 4.0 Internati
 
 > **DiagnoseMyDisk** adalah utilitas desktop diagnostik hardware dan manajemen penyimpanan tingkat lanjut untuk Windows 10 & 11. Aplikasi ini membongkar manipulasi pelaporan firmware (*False 100% masking*), menghitung persentase kesehatan fisik sebenarnya (*True Health*) pada SSD NVMe, SSD SATA, dan HDD mekanikal, memindai **Bad Sector** permukaan piringan/sel secara visual (*Surface LBA Map*), memulihkan sistem file & mengoptimasi sel NAND (*Drive Doctor*), menyajikan analisis kuota disk gaya *Microsoft PC Manager*, mendeteksi berkas duplikat berbasis *SHA-256*, serta menyediakan **Inspeksi Isi Folder Interaktif** dan **Log Diagnostik Real-Time** melalui antarmuka desktop berstandar **Anti-Slop Zinc Modern**.
 
+### Dibuat untuk yang tidak percaya tulisan "100% Good"
+
+Drive bisa melaporkan `Current = 100` sementara register mentahnya menunjukkan sel NAND aus, sektor direlokasi, atau cadangan blok menipis. DiagnoseMyDisk membaca buktinya, menunjukkan dari mana setiap angka berasal, dan menulis `N/A` saat bukti tidak tersedia. Tanpa akun cloud, tanpa telemetri, tanpa angka rekayasa.
+
+| Sorotan v3.0.0 | Dampak nyata |
+| :--- | :--- |
+| **API lokal dikeraskan** | Token per-launch, validasi Host/Origin, tanpa CORS wildcard, allowlist path, dan proteksi command injection. |
+| **Telemetri berbasis bukti** | Label `LIVE WMI` / `CDI CACHE` / `UNAVAILABLE`, daftar data gap, dan `N/A` untuk nilai yang tidak terbaca. |
+| **Penyimpanan terukur** | Kategori memakai byte yang benar-benar dipindai; kapasitas belum terpindai diberi label sendiri, bukan estimasi palsu. |
+| **UI storage diperbaiki** | Filter, badge, pemilihan rekomendasi, folder inspection, export laporan HTML, dan empty/loading state bekerja konsisten. |
+| **Kualitas terverifikasi** | 52 test otomatis, security regression test, performance guardrail, dan QA browser pada hardware nyata. |
+
+**Hasil uji nyata:** scan `C:` 24.106 file dalam ~16 detik, 131 grup duplikat, 10 rekomendasi, dan latensi API cache ~1,1 ms. Semua trafik tetap di `127.0.0.1`.
+
 ---
 
-## Unduh & Pasang Sekarang (v2.1.1)
+## Unduh & Pasang Sekarang (v3.0.0)
 
 Tersedia versi siap pakai untuk Windows 10 & 11 (64-bit):
 
 | Paket Rilis | Deskripsi | Tautan Unduhan Langsung |
 | :--- | :--- | :--- |
-| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke sistem lokal, pembuatan shortcut desktop & start menu. Tanpa hak akses Administrator. | [**Unduh DiagnoseMyDisk_Setup.exe (v2.1.1)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v2.1.1/DiagnoseMyDisk_Setup.exe) |
-| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v2.1.1-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v2.1.1/DiagnoseMyDisk-v2.1.1-portable.zip) |
+| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke local AppData, Start Menu, dan shortcut desktop opsional. Tanpa hak Administrator saat instalasi. | [**Unduh DiagnoseMyDisk_Setup.exe (v3.0.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/DiagnoseMyDisk_Setup.exe) |
+| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v3.0.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/DiagnoseMyDisk-v3.0.0-portable.zip) |
+| **Checksum** | SHA-256 untuk kedua aset rilis. Verifikasi sebelum menjalankan. | [**Unduh SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/SHA256SUMS.txt) |
 
-Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases).
+Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases). Aplikasi memerlukan Windows 10/11 x64 dan membuka jendela Edge/Chrome khusus pada `127.0.0.1:5550`.
 
 ---
 
-## Matriks Fitur & Arsitektur Utama (v2.1.1)
+## Matriks Fitur & Arsitektur Utama (v3.0.0)
 
 | Kategori | Fitur & Kapabilitas | Sub-Sistem / Engine | Invarian & Standar Teknis | Status |
 | :--- | :--- | :--- | :--- | :---: |
 | **Manajemen Folder** | **Inspeksi Folder Interaktif (Expand)** *(v2.1.0)* | `backend/storage_manager.py` & UI | Klik pada baris folder (GPU Cache, Downloads, Browser Cache, Folder Besar) untuk membuka daftar berkas di dalamnya secara instan (urut ukuran terbesar, tanggal modifikasi, shortcut buka Explorer). | ✅ `ACTIVE` |
-| **Preferensi & Bahasa** | **Bahasa Inggris Default & Persistensi Dwibahasa** *(v2.1.1)* | `server.py` & `static/app.js` | Bahasa default adalah English pada sesi baru. Pilihan bahasa tersimpan otomatis ke `localStorage` dan disinkronkan ke profil server `user_preferences.json` untuk sesi berikutnya. | ✅ `ACTIVE` |
+| **Preferensi & Bahasa** | **Bahasa Inggris Default & Persistensi Dwibahasa** *(v3.0.0)* | `server.py` & `static/app.js` | Bahasa default adalah English pada sesi baru. Pilihan bahasa tersimpan otomatis ke `localStorage` dan disinkronkan ke profil server `user_preferences.json` untuk sesi berikutnya. | ✅ `ACTIVE` |
 | **Logging & Telemetri** | **Log Diagnostik Live (AI & Human Console)** | `backend/app_logger.py` & UI | Perekaman ganda berkas log persisten (`diagnose_my_disk.log`) + *in-memory ring buffer* 1000 baris dengan live polling, copy to clipboard, dan buka instan di Notepad. | ✅ `ACTIVE` |
 | **Penyimpanan & Kuota** | **Segmented Storage Analyzer (PC Manager Style)** | `backend/storage_manager.py` & UI | Visualisasi segmented bar kapasitas disk (Berkas Pengguna, Aplikasi, Sistem Windows, Recycle Bin, Lainnya/Cache) untuk semua drive atau per-drive. | ✅ `ACTIVE` |
 | | **Deteksi Berkas Duplikat 2-Tier** | `backend/storage_manager.py` | Scanning duplikat cepat: Tier 1 verifikasi kesamaan ukuran + 4KB MD5 header, dilanjutkan Tier 2 hashing SHA-256 utuh dengan proteksi exclusion folder sistem WindowsApps. | ✅ `ACTIVE` |
@@ -324,14 +470,14 @@ Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](h
 | **Surface & Repair** | **Bad Sector Surface LBA Map** | `backend/scanner.py` & UI | Memindai 200 blok fisik drive secara non-destruktif dengan sector-aligned I/O (kelipatan 512 bytes), mengukur latensi milidetik (ms) dan memetakan blok sehat, lemah, hingga bad sector. | ✅ `ACTIVE` |
 | | **Drive Doctor (CHKDSK & TRIM)** | `backend/scanner.py` & UI | Memicu perbaikan cluster & metadata volume Windows (Repair-Volume), optimasi sel flash NAND (ReTrim), serta audit status Dirty Bit. | ✅ `ACTIVE` |
 | **Kalkulasi Kesehatan** | **Unmasking Firmware False 100%** | `backend/smart_decoder.py` | Mengabaikan kolom `Current` firmware statis; menghitung degradasi riil dari register mentah `0xA9`, relokasi `0x05`, dan bad block `0xA6`. | ✅ `ACTIVE` |
-| | **NVMe 2.0 True Health Engine** | `backend/smart_decoder.py` | Kepatuhan NVM Express 2.0 Log Page 02h: memvalidasi `Percentage Used` vs `Available Spare` & `Media Integrity Errors`. | ✅ `ACTIVE` |
+| | **NVMe 2.0 True Health Engine** | `backend/smart_decoder.py` | Kepatuhan NVM Express 2.0 Log Page 02h: mengevaluasi `Percentage Used` dan `Available Spare` bila tersedia. Nilai yang tidak ada ditampilkan `N/A` beserta provenance dan data gap. | ✅ `ACTIVE` |
 | | **Write Amplification (WAF)** | `backend/smart_decoder.py` | Rasio akumulasi penulisan data host terhadap penulisan fisik sel NAND (`HostWrites` vs `NandWrites`). | ✅ `ACTIVE` |
 | **Akuisisi Telemetri** | **Multi-Tier Telemetry Cascade** | `backend/collector.py` | **Tier 1:** Live CIM WMI non-blocking (`Win32_DiskDrive`, `Get-PhysicalDisk`).<br>**Tier 2:** Hardware Cache fallback (`Smart.ini` & CDI database).<br>**Tier 3:** Deterministic Cache Reconstruction (instan 0.01 detik). | ✅ `ACTIVE` |
 | | **Zero Blank Screen Guarantee** | `backend/collector.py` | Mencegah tampilan disk kosong (`[]`); jika WMI timeout/restricted, sistem otomatis merekonstruksi profil disk dari cache lokal. | ✅ `ACTIVE` |
 | | **Pemetaan Partisi & Volume Otomatis** | `backend/collector.py` | Menghubungkan setiap drive fisik ke drive letter aktif (`C:`, `D:`, `E:`, ... Drive N) dengan kalkulasi kapasitas real-time. | ✅ `ACTIVE` |
 | **Runtime & Performa** | **100% Zero-CDN Offline Native** | `static/` | Tailwind CSS dan Lucide Icons dibundel lokal (`tailwind.min.js`, `lucide.min.js`). Berjalan 100% tanpa internet. | ✅ `ACTIVE` |
 | | **Koneksi IPv4 Instan** | `server.py` | Mengikat socket ke `127.0.0.1:5550` langsung; mengeliminasi latensi negosiasi IPv6 `[::1]` pada Windows. | ✅ `ACTIVE` |
-| | **Watchdog & Clean Auto-Shutdown** | `server.py` & `static/app.js` | Heartbeat 2.5s + `navigator.sendBeacon('/api/shutdown')`. Bebas dari *ghost background processes*. | ✅ `ACTIVE` |
+| | **Watchdog & Clean Auto-Shutdown** | `server.py` & `static/app.js` | Heartbeat 2.5s + watchdog. Backend keluar hanya setelah heartbeat benar-benar berhenti; reload halaman tidak mematikan server. | ✅ `ACTIVE` |
 | **UI/UX & Desain** | **Anti-Slop Desktop Shell** | `static/index.html` & `style.css` | Viewport desktop terkunci (`h-screen overflow-hidden`), palet warna Zinc netral (OKLCH), angka tabular (`tabular-nums`), mode gelap berdefinisi tinggi. | ✅ `ACTIVE` |
 | | **Tabel Forensik S.M.A.R.T 7-Kolom** | `static/app.js` | Menampilkan Kondisi (3D spheres), Hex ID, Nama Atribut, Current, Worst, Ambang Batas Pabrikan (*Threshold*), dan Raw Hex/Dec. | ✅ `ACTIVE` |
 | | **Dukungan Bilingual Instan (ID / EN)** | `static/app.js` | Beralih bahasa secara real-time dalam satu klik tanpa refresh halaman. | ✅ `ACTIVE` |
@@ -470,7 +616,7 @@ iscc installer.iss
 ```powershell
 python -m unittest discover tests
 ```
-*Seluruh 15 test suite wajib lulus (Exit Code 0).*
+*Seluruh 52 test suite wajib lulus (Exit Code 0).*
 
 ---
 
