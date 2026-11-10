@@ -51,93 +51,102 @@
 </head>
 <body class="h-screen overflow-hidden flex flex-col bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 antialiased">
 
-  <!-- FIXED APPLICATION TOOLBAR -->
-  <header class="shrink-0 px-4 py-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs z-30 transition-colors">
-    <div class="flex flex-col md:flex-row items-center justify-between gap-2.5 max-w-[1440px] mx-auto w-full">
-      
-      <!-- Brand & Engine Status -->
-      <div class="flex items-center gap-3 w-full md:w-auto">
-        <div class="w-8 h-8 rounded-md bg-zinc-900 dark:bg-zinc-800 flex items-center justify-center p-1.5 shadow-xs shrink-0 border border-zinc-700/50">
-          <img src="icon-32.png" alt="DiagnoseMyDisk Icon" class="w-full h-full object-contain">
+  <!-- DESKTOP APP SHELL -->
+  <div class="app-shell">
+    <aside class="app-sidebar" aria-label="Primary navigation">
+      <div class="sidebar-brand">
+        <div class="sidebar-logo">
+          <img src="icon-32.png" alt="DiagnoseMyDisk icon">
         </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="text-sm font-black tracking-tight text-zinc-900 dark:text-zinc-50">Diagnose<span class="text-blue-600 dark:text-blue-400">MyDisk</span></span>
-            <span class="px-1.5 py-0.2 text-[10px] font-mono font-bold rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700">v__APP_VERSION__</span>
-            
-            <!-- Admin Status Badge -->
-            <div id="admin-badge-container" class="flex items-center gap-1.5 pl-1.5">
-              <span id="admin-dot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span id="lbl-admin-status" class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap">Admin OK</span>
-            </div>
+        <div class="sidebar-brand-text">
+          <div class="sidebar-wordmark">Diagnose<span>MyDisk</span></div>
+          <div class="sidebar-version">v__APP_VERSION__</div>
+        </div>
+      </div>
+      <p class="sidebar-tagline" id="header-subtitle">Evidence first. Never invent telemetry.</p>
+
+      <nav class="sidebar-nav" aria-label="Workspace">
+        <div class="sidebar-section-label" id="lbl-sidebar-workspace">Workspace</div>
+        <button id="btn-mode-layman" onclick="setMode('layman')" class="app-nav-item is-active" aria-current="page" title="Summary">
+          <i data-lucide="layout-dashboard" class="nav-icon"></i>
+          <span id="txt-mode-layman" class="nav-label">Summary</span>
+        </button>
+        <button id="btn-mode-tech" onclick="setMode('tech')" class="app-nav-item" title="S.M.A.R.T forensic view">
+          <i data-lucide="table-2" class="nav-icon"></i>
+          <span id="txt-mode-tech" class="nav-label">S.M.A.R.T Forensic</span>
+        </button>
+        <button id="btn-mode-scanner" onclick="setMode('scanner')" class="app-nav-item" title="Bad sector scan and repair">
+          <i data-lucide="scan-line" class="nav-icon"></i>
+          <span id="txt-mode-scanner" class="nav-label">Bad Sector & Repair</span>
+        </button>
+        <button id="btn-mode-storage" onclick="setMode('storage')" class="app-nav-item" title="Storage and cleanup">
+          <i data-lucide="hard-drive-download" class="nav-icon"></i>
+          <span id="txt-mode-storage" class="nav-label">Storage & Cleanup</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-label" id="lbl-sidebar-tools">Tools</div>
+        <button onclick="openLogsModal()" id="btn-open-logs" class="app-nav-item app-nav-item--quiet" title="Open application diagnostic logs" aria-label="Open application diagnostic logs">
+          <i data-lucide="file-terminal" class="nav-icon"></i>
+          <span id="txt-btn-logs" class="nav-label">Logs</span>
+        </button>
+        <button onclick="exportDiagnosticReport()" id="btn-export-report" class="app-nav-item app-nav-item--quiet" title="Export diagnostic report as HTML" aria-label="Export diagnostic report as HTML">
+          <i data-lucide="download" class="nav-icon"></i>
+          <span id="txt-export-report" class="nav-label">Export report</span>
+        </button>
+      </div>
+
+      <div class="sidebar-insight">
+        <div class="sidebar-insight-label">LOCAL API</div>
+        <div class="sidebar-insight-value">127.0.0.1:5550</div>
+        <div class="sidebar-insight-meta">No external requests</div>
+      </div>
+
+      <div class="sidebar-section sidebar-preferences">
+        <div class="sidebar-section-label" id="lbl-sidebar-preferences">Preferences</div>
+        <div class="sidebar-pref-row">
+          <button onclick="toggleTheme()" id="btn-theme" class="app-icon-button" title="Toggle light or dark theme" aria-label="Toggle light or dark theme">
+            <i data-lucide="sun" id="theme-icon" class="nav-icon"></i>
+            <span id="theme-text" class="nav-label">Light</span>
+          </button>
+          <div class="lang-switch" role="group" aria-label="Language">
+            <button id="btn-lang-id" onclick="setLanguage('id')" class="lang-button">ID</button>
+            <button id="btn-lang-en" onclick="setLanguage('en')" class="lang-button is-active">EN</button>
           </div>
-          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 hidden md:block" id="header-subtitle">Verifikasi Kesehatan Sebenarnya, Bad Sector, Telemetri S.M.A.R.T & Manajemen Penyimpanan</p>
         </div>
       </div>
 
-      <!-- Control Toolbar -->
-      <div class="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
-        
-        <!-- View Mode Segmented Control -->
-        <div class="bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-700 flex items-center text-xs">
-          <button id="btn-mode-layman" onclick="setMode('layman')" class="flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-all bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs">
-            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400"></i>
-            <span id="txt-mode-layman">Ringkasan</span>
-          </button>
-          <button id="btn-mode-tech" onclick="setMode('tech')" class="flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-all text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
-            <i data-lucide="table-2" class="w-3.5 h-3.5"></i>
-            <span id="txt-mode-tech">Forensik S.M.A.R.T</span>
-          </button>
-          <button id="btn-mode-scanner" onclick="setMode('scanner')" class="flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-all text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
-            <i data-lucide="activity" class="w-3.5 h-3.5 text-rose-500"></i>
-            <span id="txt-mode-scanner">Pindai Sektor & Pemulihan</span>
-          </button>
-          <button id="btn-mode-storage" onclick="setMode('storage')" class="flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-all text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
-            <i data-lucide="hard-drive-download" class="w-3.5 h-3.5 text-emerald-500"></i>
-            <span id="txt-mode-storage">Penyimpanan & Bersih</span>
-          </button>
+      <div class="sidebar-footer">
+        <div id="admin-badge-container" class="sidebar-admin">
+          <span id="admin-dot" class="admin-dot is-ok"></span>
+          <span id="lbl-admin-status" class="sidebar-admin-text">Admin OK</span>
         </div>
-
-        <div class="h-4 w-[1px] bg-zinc-200 dark:border-zinc-800 mx-0.5 hidden sm:block"></div>
-
-        <!-- Language Switcher -->
-        <div class="bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-700 flex items-center text-xs font-mono">
-          <button id="btn-lang-id" onclick="setLanguage('id')" class="px-2 py-0.5 rounded font-bold transition-all text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
-            ID
-          </button>
-          <button id="btn-lang-en" onclick="setLanguage('en')" class="px-2 py-0.5 rounded font-bold transition-all bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs">
-            EN
-          </button>
-        </div>
-
-        <!-- Theme Toggle -->
-        <button onclick="toggleTheme()" id="btn-theme" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-medium shadow-xs transition-all">
-          <i data-lucide="sun" id="theme-icon" class="w-3.5 h-3.5 text-amber-500"></i>
-          <span id="theme-text" class="hidden sm:inline">Terang</span>
-        </button>
-
-        <!-- App Diagnostic Logs Button -->
-        <button onclick="openLogsModal()" id="btn-open-logs" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-medium shadow-xs transition-all" title="Buka Log Diagnostik Aplikasi (AI & Human Troubleshooting)">
-          <i data-lucide="file-terminal" class="w-3.5 h-3.5 text-blue-500"></i>
-          <span id="txt-btn-logs" class="hidden sm:inline">Log</span>
-        </button>
-
-        <!-- Export Report -->
-        <button onclick="exportDiagnosticReport()" id="btn-export-report" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-medium shadow-xs transition-all" title="Ekspor laporan diagnostik sebagai file HTML">
-          <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-500"></i>
-          <span id="txt-export-report" class="hidden sm:inline">Ekspor</span>
-        </button>
-
-        <!-- Rescan Action Button -->
-        <button onclick="refreshData()" id="btn-refresh" class="flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-all active:scale-95">
-          <i data-lucide="refresh-cw" id="refresh-icon" class="w-3.5 h-3.5"></i>
-          <span id="txt-refresh">Pindai Ulang</span>
-        </button>
-
+        <span class="sidebar-footer-meta">LOCAL ONLY</span>
       </div>
+    </aside>
 
-    </div>
-  </header>
+    <div class="app-main-column">
+      <header class="app-topbar">
+        <div class="topbar-context">
+          <div class="topbar-eyebrow" id="topbar-eyebrow">Active drive</div>
+          <div class="topbar-title-row">
+            <span id="topbar-disk-name">--</span>
+            <span id="topbar-health-chip" class="topbar-chip">--</span>
+            <span id="topbar-source-badge" class="topbar-source">--</span>
+          </div>
+          <div id="topbar-disk-meta" class="topbar-meta">Waiting for telemetry</div>
+        </div>
+        <div class="topbar-actions">
+          <span id="topbar-updated" class="topbar-updated">Updated: --</span>
+          <button onclick="refreshData()" id="btn-refresh" class="btn-primary" title="Rescan hardware telemetry" aria-label="Rescan hardware telemetry">
+            <i data-lucide="refresh-cw" id="refresh-icon" class="w-4 h-4"></i>
+            <span id="txt-refresh">Rescan</span>
+          </button>
+        </div>
+      </header>
 
   <!-- NON-ADMIN ELEVATION NOTICE (Hidden by default, shown if non-admin) -->
   <div id="non-admin-banner" class="hidden shrink-0 bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-900 dark:text-amber-200">
@@ -182,7 +191,7 @@
       </section>
 
       <!-- SECTION: FIRMWARE MASKING ALERT BANNER -->
-      <div id="masking-banner" class="hidden rounded-lg p-3.5 border border-amber-300 dark:border-amber-700/60 shimmer-masking shadow-xs">
+      <div id="masking-banner" class="hidden rounded-lg p-3.5 border border-amber-300 dark:border-amber-700/60 shadow-xs">
         <div class="flex items-start gap-3">
           <div class="p-1.5 bg-amber-500 text-white rounded-md mt-0.5 shrink-0">
             <i data-lucide="alert-triangle" class="w-4 h-4"></i>
@@ -206,21 +215,23 @@
             
             <!-- Health Metric Badge -->
             <div class="flex flex-col items-center text-center">
-              <span class="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1" id="txt-health-status-header">Status Kesehatan</span>
-              <div id="cdi-health-badge" class="w-44 py-2.5 px-3 rounded-lg flex flex-col items-center justify-center text-center select-none shadow-xs border">
-                <div id="badge-label" class="text-sm font-black tracking-wide uppercase">Loading</div>
-                <div id="badge-percentage" class="text-3xl font-extrabold tracking-tight font-mono tabular-nums mt-0.5">--%</div>
-                <div id="badge-sub" class="text-[10px] opacity-90 font-medium">True Health</div>
+              <span class="text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.14em] mb-2" id="txt-health-status-header">Status Kesehatan</span>
+              <div id="cdi-health-badge" class="health-orbit health-orbit--unknown select-none" style="--health: 0%">
+                <div class="health-orbit-inner">
+                  <div id="badge-label" class="health-label">Loading</div>
+                  <div id="badge-percentage" class="health-value">--%</div>
+                  <div id="badge-sub" class="health-sub">True Health</div>
+                </div>
               </div>
-              <div id="badge-cdi-compare" class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium mt-1.5 text-center">
+              <div id="badge-cdi-compare" class="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium mt-3 text-center max-w-[220px] leading-relaxed">
                 Alat standar membaca: <span id="cdi-claim-val" class="text-zinc-800 dark:text-zinc-200 font-mono font-bold">100%</span>
               </div>
             </div>
 
             <!-- Temperature Metric Badge -->
             <div class="flex flex-col items-center text-center">
-              <span class="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1" id="txt-temp-header">Suhu Operasional</span>
-              <div id="cdi-temp-badge" class="w-36 py-2 px-3 rounded-lg flex items-center justify-center gap-2 select-none shadow-xs border bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700">
+              <span class="text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.14em] mb-2" id="txt-temp-header">Suhu Operasional</span>
+              <div id="cdi-temp-badge" class="temp-card select-none">
                 <i data-lucide="thermometer" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
                 <span id="badge-temp" class="text-xl font-black font-mono tabular-nums">-- °C</span>
               </div>
@@ -257,37 +268,37 @@
 
             <!-- Metadata Specs Grid (8 Hardware Telemetry Points) -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-y-2 gap-x-3 text-xs font-mono">
-              <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
-                <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-firmware">FIRMWARE</span>
-                <span id="spec-firmware" class="text-zinc-800 dark:text-zinc-200 font-semibold truncate block">--</span>
+              <div class="spec-tile">
+                <span class="spec-label" id="lbl-firmware">FIRMWARE</span>
+                <span id="spec-firmware" class="spec-value">--</span>
               </div>
-              <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
-                <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-serial">SERIAL NUMBER</span>
-                <span id="spec-serial" class="text-zinc-800 dark:text-zinc-200 font-semibold truncate block">--</span>
+              <div class="spec-tile">
+                <span class="spec-label" id="lbl-serial">SERIAL NUMBER</span>
+                <span id="spec-serial" class="spec-value">--</span>
               </div>
-              <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
-                <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-interface">INTERFACE</span>
-                <span id="spec-interface" class="text-zinc-800 dark:text-zinc-200 font-semibold truncate block">--</span>
+              <div class="spec-tile">
+                <span class="spec-label" id="lbl-interface">INTERFACE</span>
+                <span id="spec-interface" class="spec-value">--</span>
               </div>
-              <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
-                <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-nand-type">TIPE FLASH / MEDIA</span>
-                <span id="spec-nand-type" class="text-blue-600 dark:text-blue-400 font-bold truncate block">--</span>
+              <div class="spec-tile">
+                <span class="spec-label" id="lbl-nand-type">TIPE FLASH / MEDIA</span>
+                <span id="spec-nand-type" class="spec-value">--</span>
               </div>
-              <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
-                <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-cache-type">CACHE / HMB</span>
-                <span id="spec-cache-type" class="text-purple-600 dark:text-purple-400 font-semibold truncate block">--</span>
+              <div class="spec-tile">
+                <span class="spec-label" id="lbl-cache-type">CACHE / HMB</span>
+                <span id="spec-cache-type" class="spec-value">--</span>
               </div>
-              <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
-                <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-poc">POWER CYCLES</span>
-                <span id="spec-poc" class="text-zinc-800 dark:text-zinc-200 font-semibold tabular-nums">-- kali</span>
+              <div class="spec-tile">
+                <span class="spec-label" id="lbl-poc">POWER CYCLES</span>
+                <span id="spec-poc" class="spec-value">-- kali</span>
               </div>
-              <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
-                <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-reads">HOST READS</span>
-                <span id="spec-reads" class="text-zinc-800 dark:text-zinc-200 font-semibold tabular-nums">-- TB</span>
+              <div class="spec-tile">
+                <span class="spec-label" id="lbl-reads">HOST READS</span>
+                <span id="spec-reads" class="spec-value">-- TB</span>
               </div>
-              <div class="bg-zinc-50 dark:bg-zinc-850 p-2 rounded border border-zinc-200/60 dark:border-zinc-800">
-                <span class="text-zinc-400 dark:text-zinc-500 block text-[10px] font-sans font-bold" id="lbl-writes">HOST WRITES</span>
-                <span id="spec-writes" class="text-blue-600 dark:text-blue-400 font-bold tabular-nums">-- TB</span>
+              <div class="spec-tile">
+                <span class="spec-label" id="lbl-writes">HOST WRITES</span>
+                <span id="spec-writes" class="spec-value">-- TB</span>
               </div>
             </div>
 
@@ -800,7 +811,7 @@
 
         <!-- SUB-TAB 1: SMART CLEANUP RECOMMENDATIONS -->
         <div id="subview-recommend" class="space-y-3">
-          <div class="app-surface p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-emerald-500/5 to-transparent border-emerald-500/20">
+          <div class="app-surface p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-emerald-500/5 border-emerald-500/20">
             <div class="flex items-center gap-2.5">
               <div class="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg shrink-0">
                 <i data-lucide="shield-check" class="w-5 h-5"></i>
@@ -978,6 +989,8 @@
       <span id="txt-footer-license">Open-Source</span>
     </div>
   </footer>
+    </div>
+  </div>
 
   <!-- TOAST NOTIFICATION LAYER -->
   <div id="toast-container" aria-live="polite" aria-atomic="false" class="fixed bottom-10 right-4 z-[70] flex flex-col gap-2 w-[min(380px,calc(100vw-2rem))] pointer-events-none"></div>

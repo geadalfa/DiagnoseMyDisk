@@ -56,7 +56,7 @@ except ImportError:
 
 PORT = 5550
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-APP_VERSION = "3.0.0"
+APP_VERSION = "3.1.0"
 APP_TOKEN = secrets.token_urlsafe(32)
 MAX_BODY_BYTES = 1024 * 1024
 LOCAL_HOSTNAMES = {"127.0.0.1", "localhost"}
@@ -75,7 +75,7 @@ def normalize_drive_target(value):
     letter = cleaned[0].upper()
     return f"{letter}:"
 
-# Persistent User Preferences Path (v3.0.0)
+# Persistent User Preferences Path (v3.1.0)
 PREFERENCES_FILE = os.path.join(
     os.environ.get("LOCALAPPDATA", BASE_DIR),
     "DiagnoseMyDisk_Profile",

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/banner.svg" alt="DiagnoseMyDisk — evidence-based storage diagnostics for Windows" width="100%">
+  <img src="docs/banner.png" alt="DiagnoseMyDisk — evidence-based storage diagnostics for Windows" width="100%">
 </p>
 
 <h1 align="center">DiagnoseMyDisk</h1>
@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Version-v3.0.0-emerald.svg?logo=github&logoColor=white" alt="Version v3.0.0"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Version-v3.1.0-emerald.svg?logo=github&logoColor=white" alt="Version v3.1.0"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
   <a href="#-privacy-guarantee-we-do-not-collect-data"><img src="https://img.shields.io/badge/Privacy-100%25%20UU%20PDP%20Compliant-blue.svg?logo=shield&logoColor=white" alt="UU PDP Compliant"></a>
@@ -51,14 +51,14 @@ A drive can report `Current = 100` while its raw registers show worn NAND cells,
 
 ---
 
-## v3.0.0 at a Glance
+## v3.1.0 at a Glance
 
-| Area | v3.0.0 |
+| Area | v3.1.0 |
 | :--- | :--- |
 | **Security** | Per-launch API token · Host/Origin validation · no wildcard CORS · path allowlists · command-injection guards |
 | **Data honesty** | Source labels · data-gap lists · `N/A` for missing values · no fabricated temperatures, POH, NVMe counters, or health percentages |
 | **Storage** | Measured category breakdown · duplicate hashing budgets · scan caps · reload-safe watchdog · Shell-based Recycle Bin cleanup |
-| **UI** | Fixed storage wiring · empty/loading states · diagnostic HTML export · toasts · keyboard focus · NVMe-aware temperature thresholds |
+| **UI** | Sidebar shell · context topbar · health ring · summary-only hero · 40-column LBA map · fixed storage wiring · diagnostic HTML export · keyboard focus |
 | **Quality** | 52 automated tests · security regression tests · performance guardrails · real-hardware browser QA |
 
 ---
@@ -81,31 +81,33 @@ These are reproducible checks, not marketing estimates. Hardware readings vary b
 
 ---
 
-## v3.0.0 Overhaul Highlights
+## v3.1.0 Overhaul Highlights
 
 - **Local API hardening:** every API request now requires a per-launch session token; `Host` and `Origin` are validated, wildcard CORS is removed, request bodies are capped, and JSON/security headers are enforced. Reloading the window no longer kills the backend.
 - **Destructive-action allowlists:** cleanup, folder inspection, and Explorer opening are limited to paths that appeared in the last scan. Drive roots, protected system directories, and files under Windows/Program Files/ProgramData are rejected. Recycle Bin is emptied through the Shell API instead of deleting raw `$Recycle.Bin` contents.
 - **No invented telemetry:** removed hardcoded health percentages, fake NVMe counters, fixed temperatures, and model-specific fallback values. Every disk now carries a provenance label (`LIVE WMI`, `CDI CACHE`, or `UNAVAILABLE`) and an explicit data-gap list. Missing values render as `N/A`.
 - **Measured storage breakdown:** category sizes are measured from bytes actually scanned; unscanned capacity is labelled `Other / unclassified`. The previous proportional 45/30/15/2/8 split is gone.
 - **Correct storage UI:** fixed broken element IDs, filter handlers, duplicate auto-selection, recommendation defaults, cleanup result fields, and added explicit empty/loading states plus a diagnostic HTML export.
+- **Sidebar-first UI revamp (v3.1.0):** 228 px workspace rail, context topbar, summary-only hero, functional health ring, flat status tints, 40-column LBA map, collapsed rail at ≤1180 px, and bilingual shell labels.
+- **Workspace clarity:** S.M.A.R.T and Bad Sector modes now open directly into their tools instead of being pushed below the summary hero.
 - **Performance:** bounded scan file counts, duplicate candidate limits, hashing byte budget, recommendation walk timeouts, cached disk geometry, and path-inspection limits. A real 24k-file C: scan completed in ~16 seconds on the test machine.
 - **Offline integrity:** removed the remaining Google Fonts import; all requests stay on `127.0.0.1`.
 
 ---
 
-## Download & Install (v3.0.0)
+## Download & Install (v3.1.0)
 
 Standalone executables for Windows 10 & 11 (64-bit):
 
 | Distribution Package | Description | Direct Download |
 | :--- | :--- | :--- |
-| **Windows Installer (.EXE)** *(Recommended)* | Automated installation to local AppData, Start Menu and optional desktop shortcut. Runs without installer-time Administrator rights. | [**Download DiagnoseMyDisk_Setup.exe (v3.0.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/DiagnoseMyDisk_Setup.exe) |
-| **Portable Archive (.ZIP)** | Standalone portable bundle. Extract and run `DiagnoseMyDisk.exe` without installation. | [**Download DiagnoseMyDisk-v3.0.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/DiagnoseMyDisk-v3.0.0-portable.zip) |
-| **Checksums** | SHA-256 for both release assets. Verify before running. | [**Download SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/SHA256SUMS.txt) |
+| **Windows Installer (.EXE)** *(Recommended)* | Automated installation to local AppData, Start Menu and optional desktop shortcut. Runs without installer-time Administrator rights. | [**Download DiagnoseMyDisk_Setup.exe (v3.1.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.1.0/DiagnoseMyDisk_Setup.exe) |
+| **Portable Archive (.ZIP)** | Standalone portable bundle. Extract and run `DiagnoseMyDisk.exe` without installation. | [**Download DiagnoseMyDisk-v3.1.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.1.0/DiagnoseMyDisk-v3.1.0-portable.zip) |
+| **Checksums** | SHA-256 for both release assets. Verify before running. | [**Download SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.1.0/SHA256SUMS.txt) |
 
 ```text
-b4d5bd690d0027e84d84b2efb47b67c79b734b5541734537ee748bfea08b243e  DiagnoseMyDisk_Setup.exe
-2bf2ac19e03196d43d5cd1485a0041870b4acdfe4d0304e00e9dcbc8ce45cf54  DiagnoseMyDisk-v3.0.0-portable.zip
+91cda0290ccf2c0b65649096ffa019de39df8abaf28ddef60acdf4b760c5fff1  DiagnoseMyDisk_Setup.exe
+638bcabae2962c8bef02ddeeec6e7fa2c438f1f0506d2e836de2bf161b813990  DiagnoseMyDisk-v3.1.0-portable.zip
 ```
 
 All official releases and commit histories are accessible on [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases). The application requires Windows 10/11 x64 and opens in a dedicated Edge/Chrome app window on `127.0.0.1:5550`.
@@ -117,7 +119,7 @@ All official releases and commit histories are accessible on [GitHub Releases](h
 | Category | Capability | Subsystem | Technical Specifications | Status |
 | :--- | :--- | :--- | :--- | :---: |
 | **Folder Inspection** | **Interactive Folder Expansion** *(v2.1.0)* | `backend/storage_manager.py` & UI | Click on any recommended folder (GPU Cache, Downloads, Browser Cache, Large Folders) to reveal its contents directly in the UI, sorted by file size descending, with modification dates and direct Explorer shortcuts. | ✅ `ACTIVE` |
-| **Preferences & i18n** | **Default English & Dual-Tier Persistence** *(v3.0.0)* | `server.py` & `static/app.js` | Defaults to English on fresh profile initialization. Persists language selections across sessions using instant synchronous `localStorage` and durable server profile storage (`user_preferences.json`). | ✅ `ACTIVE` |
+| **Preferences & i18n** | **Default English & Dual-Tier Persistence** *(v3.1.0)* | `server.py` & `static/app.js` | Defaults to English on fresh profile initialization. Persists language selections across sessions using instant synchronous `localStorage` and durable server profile storage (`user_preferences.json`). | ✅ `ACTIVE` |
 | **Diagnostic Logging** | **Live Telemetry & Diagnostic Console** | `backend/app_logger.py` & UI | Dual logging engine: persistent file logging (`diagnose_my_disk.log`) and 1000-line in-memory ring buffer with live polling, clipboard copy, and direct Notepad launch. | ✅ `ACTIVE` |
 | **Storage Allocation** | **Segmented Storage Analyzer** | `backend/storage_manager.py` & UI | PC Manager-style segmented bar representing capacity distribution: User Files, Applications, Windows System, Recycle Bin, and Other/Caches. | ✅ `ACTIVE` |
 | | **Two-Tier Duplicate File Detection** | `backend/storage_manager.py` | Tier 1: exact file size matching and 4KB MD5 header hash; Tier 2: full SHA-256 verification with automatic exclusion of protected system directories (`WindowsApps`, `C:\Windows`). | ✅ `ACTIVE` |
@@ -133,7 +135,7 @@ All official releases and commit histories are accessible on [GitHub Releases](h
 | **Runtime & Network** | **Zero-CDN Offline Operation** | `static/` | Tailwind CSS and Lucide vector icons are bundled locally (`tailwind.min.js`, `lucide.min.js`). Operates completely without internet access. | ✅ `ACTIVE` |
 | | **Direct IPv4 Socket** | `server.py` | Binds directly to `127.0.0.1:5550`, eliminating Windows IPv6 `[::1]` resolution latency. | ✅ `ACTIVE` |
 | | **Watchdog & Clean Auto-Shutdown** | `server.py` & `static/app.js` | Heartbeat polling (2.5s) drives a watchdog that exits only after the heartbeat stops. Reloading the page no longer kills the backend. | ✅ `ACTIVE` |
-| **Local Security** | **Token + Path Allowlist Hardening** *(v3.0.0)* | `server.py` & `backend/storage_manager.py` | Per-launch API token, Host/Origin checks, no wildcard CORS, body caps, protected-tree rejection, and command-injection guards on repair actions. | ✅ `ACTIVE` |
+| **Local Security** | **Token + Path Allowlist Hardening** *(v3.1.0)* | `server.py` & `backend/storage_manager.py` | Per-launch API token, Host/Origin checks, no wildcard CORS, body caps, protected-tree rejection, and command-injection guards on repair actions. | ✅ `ACTIVE` |
 | **UI/UX Design** | **Anti-Slop Desktop Shell** | `static/index.html` & `style.css` | Fixed desktop viewport (`h-screen overflow-hidden`), neutral Zinc design tokens (OKLCH), tabular numeric alignment (`tabular-nums`), high-contrast dark mode. | ✅ `ACTIVE` |
 | | **7-Column Forensic S.M.A.R.T Table** | `static/app.js` | Displays Condition (3D spheres), Hex ID, Attribute Name, Current, Worst, Manufacturer Threshold, and Raw Hex/Dec values. | ✅ `ACTIVE` |
 | | **Instant Bilingual Switching (EN / ID)** | `static/app.js` | Real-time language switching without page reloads or interface flashes. | ✅ `ACTIVE` |
@@ -242,7 +244,7 @@ DiagnoseMyDisk/
 │   ├── smart_decoder.py      # S.M.A.R.T raw register decoder, thresholds & True Health engine
 │   └── storage_manager.py    # Multi-drive storage analyzer, duplicate finder & interactive folder inspector
 ├── docs/
-│   └── banner.svg            # README promo banner (offline vector, no external assets)
+│   └── banner.png            # README promo banner (local asset, no external requests)
 ├── static/
 │   ├── app.js                # Anti-slop frontend controller, bilingual i18n & folder expansion
 │   ├── index.html            # Contained desktop shell layout (Zinc palette, high information density)
@@ -259,7 +261,7 @@ DiagnoseMyDisk/
 │   └── test_storage_manager.py # Storage engine, measured summaries, allowlists & folder inspector
 ├── app_icon.ico              # Windows PE executable icon
 ├── DiagnoseMyDisk.spec       # PyInstaller build specification (Clean standalone bundle)
-├── installer.iss             # Inno Setup Windows installer script (v3.0.0)
+├── installer.iss             # Inno Setup Windows installer script (v3.1.0)
 ├── release.py                # Automated GitHub release & asset deployment runner
 ├── server.py                 # Multi-threaded server, IPv4 direct routing, watchdog & preferences
 ├── run.bat                   # Quick development launcher
@@ -317,7 +319,7 @@ python -m unittest discover tests
 
 ---
 
-## Security Model (v3.0.0)
+## Security Model (v3.1.0)
 
 DiagnoseMyDisk is a **local desktop utility**, but it still treats its loopback API as an attack surface.
 
@@ -352,7 +354,7 @@ The app computes *True Health* from raw registers and flags firmware-locked `Cur
 No. Cleanup requires explicit selection and confirmation, runs only against last-scan allowlists, and refuses protected system paths.
 
 **Does it work offline?**  
-Yes. Tailwind, Lucide, icons, and styles are bundled locally; the remaining Google Fonts dependency was removed in v3.0.0.
+Yes. Tailwind, Lucide, icons, and styles are bundled locally; the remaining Google Fonts dependency was removed in v3.1.0.
 
 ---
 
@@ -383,10 +385,13 @@ Yes. Tailwind, Lucide, icons, and styles are bundled locally; the remaining Goog
 ## Anti-Slop UI/UX Design Standards
 
 DiagnoseMyDisk adheres strictly to **Anti-Slop Software Engineering** principles:
-* **No Center-Aligned Everything:** Information is organized across structured 12-column grids and bento containers with a max width constraint of `max-w-[1400px]`.
-* **Zero Artificial Gradients:** No purple/indigo marketing gradients. Uses a neutral **Zinc** scale with WCAG AAA verified contrast ratios.
-* **Fixed Desktop Viewport:** Screen bounds locked to `h-screen overflow-hidden`. The main content area scrolls independently to eliminate window shifting.
-* **Typographic Stability:** All telemetry metrics, temperatures, percentages, and register offsets utilize `tabular-nums` and monospace fonts to prevent layout jitter during real-time updates.
+* **Sidebar-first Desktop Shell:** A 228 px workspace rail holds primary navigation, tools, preferences, and the local-API trust card. A compact context topbar shows the active drive, true-health chip, provenance, and rescan action.
+* **No Center-Aligned Everything:** Information is organized across structured 12-column grids and bento containers with a max width constraint of `max-w-[1440px]`.
+* **Zero Artificial Gradients:** Status surfaces use flat semantic tints instead of marketing gradients. The health score is a functional conic ring, not decoration.
+* **Fixed Desktop Viewport:** Screen bounds locked to `h-screen overflow-hidden`. The rail and topbar stay fixed while the workspace scrolls independently.
+* **Typographic Stability:** Telemetry metrics, temperatures, percentages, and register offsets use `tabular-nums` and monospace fonts; body copy stays on Segoe UI Variable.
+* **Data-First Visualization:** The 40-column surface LBA map, S.M.A.R.T condition spheres, and segmented storage bar use shape plus label so status is never conveyed by color alone.
+* **Accessible Interaction:** Focus-visible rings, ARIA labels, tooltips on collapsed navigation, reduced-motion support, and 32–44 px desktop control targets.
 * **Zero Decorative Emojis in Controls:** Navigation bars and toolbars use SVG vector glyphs from Lucide Icons.
 
 ---
@@ -431,7 +436,7 @@ Distributed under the **Creative Commons Attribution-NonCommercial 4.0 Internati
 
 Drive bisa melaporkan `Current = 100` sementara register mentahnya menunjukkan sel NAND aus, sektor direlokasi, atau cadangan blok menipis. DiagnoseMyDisk membaca buktinya, menunjukkan dari mana setiap angka berasal, dan menulis `N/A` saat bukti tidak tersedia. Tanpa akun cloud, tanpa telemetri, tanpa angka rekayasa.
 
-| Sorotan v3.0.0 | Dampak nyata |
+| Sorotan v3.1.0 | Dampak nyata |
 | :--- | :--- |
 | **API lokal dikeraskan** | Token per-launch, validasi Host/Origin, tanpa CORS wildcard, allowlist path, dan proteksi command injection. |
 | **Telemetri berbasis bukti** | Label `LIVE WMI` / `CDI CACHE` / `UNAVAILABLE`, daftar data gap, dan `N/A` untuk nilai yang tidak terbaca. |
@@ -443,26 +448,26 @@ Drive bisa melaporkan `Current = 100` sementara register mentahnya menunjukkan s
 
 ---
 
-## Unduh & Pasang Sekarang (v3.0.0)
+## Unduh & Pasang Sekarang (v3.1.0)
 
 Tersedia versi siap pakai untuk Windows 10 & 11 (64-bit):
 
 | Paket Rilis | Deskripsi | Tautan Unduhan Langsung |
 | :--- | :--- | :--- |
-| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke local AppData, Start Menu, dan shortcut desktop opsional. Tanpa hak Administrator saat instalasi. | [**Unduh DiagnoseMyDisk_Setup.exe (v3.0.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/DiagnoseMyDisk_Setup.exe) |
-| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v3.0.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/DiagnoseMyDisk-v3.0.0-portable.zip) |
-| **Checksum** | SHA-256 untuk kedua aset rilis. Verifikasi sebelum menjalankan. | [**Unduh SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.0.0/SHA256SUMS.txt) |
+| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke local AppData, Start Menu, dan shortcut desktop opsional. Tanpa hak Administrator saat instalasi. | [**Unduh DiagnoseMyDisk_Setup.exe (v3.1.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.1.0/DiagnoseMyDisk_Setup.exe) |
+| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v3.1.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.1.0/DiagnoseMyDisk-v3.1.0-portable.zip) |
+| **Checksum** | SHA-256 untuk kedua aset rilis. Verifikasi sebelum menjalankan. | [**Unduh SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.1.0/SHA256SUMS.txt) |
 
 Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases). Aplikasi memerlukan Windows 10/11 x64 dan membuka jendela Edge/Chrome khusus pada `127.0.0.1:5550`.
 
 ---
 
-## Matriks Fitur & Arsitektur Utama (v3.0.0)
+## Matriks Fitur & Arsitektur Utama (v3.1.0)
 
 | Kategori | Fitur & Kapabilitas | Sub-Sistem / Engine | Invarian & Standar Teknis | Status |
 | :--- | :--- | :--- | :--- | :---: |
 | **Manajemen Folder** | **Inspeksi Folder Interaktif (Expand)** *(v2.1.0)* | `backend/storage_manager.py` & UI | Klik pada baris folder (GPU Cache, Downloads, Browser Cache, Folder Besar) untuk membuka daftar berkas di dalamnya secara instan (urut ukuran terbesar, tanggal modifikasi, shortcut buka Explorer). | ✅ `ACTIVE` |
-| **Preferensi & Bahasa** | **Bahasa Inggris Default & Persistensi Dwibahasa** *(v3.0.0)* | `server.py` & `static/app.js` | Bahasa default adalah English pada sesi baru. Pilihan bahasa tersimpan otomatis ke `localStorage` dan disinkronkan ke profil server `user_preferences.json` untuk sesi berikutnya. | ✅ `ACTIVE` |
+| **Preferensi & Bahasa** | **Bahasa Inggris Default & Persistensi Dwibahasa** *(v3.1.0)* | `server.py` & `static/app.js` | Bahasa default adalah English pada sesi baru. Pilihan bahasa tersimpan otomatis ke `localStorage` dan disinkronkan ke profil server `user_preferences.json` untuk sesi berikutnya. | ✅ `ACTIVE` |
 | **Logging & Telemetri** | **Log Diagnostik Live (AI & Human Console)** | `backend/app_logger.py` & UI | Perekaman ganda berkas log persisten (`diagnose_my_disk.log`) + *in-memory ring buffer* 1000 baris dengan live polling, copy to clipboard, dan buka instan di Notepad. | ✅ `ACTIVE` |
 | **Penyimpanan & Kuota** | **Segmented Storage Analyzer (PC Manager Style)** | `backend/storage_manager.py` & UI | Visualisasi segmented bar kapasitas disk (Berkas Pengguna, Aplikasi, Sistem Windows, Recycle Bin, Lainnya/Cache) untuk semua drive atau per-drive. | ✅ `ACTIVE` |
 | | **Deteksi Berkas Duplikat 2-Tier** | `backend/storage_manager.py` | Scanning duplikat cepat: Tier 1 verifikasi kesamaan ukuran + 4KB MD5 header, dilanjutkan Tier 2 hashing SHA-256 utuh dengan proteksi exclusion folder sistem WindowsApps. | ✅ `ACTIVE` |
@@ -623,10 +628,13 @@ python -m unittest discover tests
 ## Standar Desain Anti-Slop UI/UX
 
 DiagnoseMyDisk dibangun dengan mematuhi prinsip **Anti-Slop Software Engineering**:
-* **No Center-Aligned Everything:** Informasi disusun menggunakan grid 12-kolom dan kontainer bento terstruktur dengan batas maksimal lebar `max-w-[1400px]`.
-* **Zero Artificial Gradients:** Dilarang menggunakan gradien ungu/indigo/pink murahan. Menggunakan palet **Zinc** netral bergradasi terang/gelap dengan kontras WCAG AAA.
-* **Fixed Desktop Shell:** Layar desktop terkunci di `h-screen overflow-hidden`. Konten utama memiliki area scroll tersendiri, mencegah window bergoyang atau melar secara tak beraturan.
-* **Typographic Stability:** Seluruh angka telemetri, suhu, sisa persentase, dan alamat register menggunakan `tabular-nums` dan font monospace agar tata letak tidak bergeser saat nilai ter-update secara real-time.
+* **Desktop Shell Berbasis Sidebar:** Rail workspace 228 px menampung navigasi utama, tools, preferensi, dan kartu trust local API. Topbar kontekstual menampilkan drive aktif, chip true health, provenance, dan aksi rescan.
+* **No Center-Aligned Everything:** Informasi disusun menggunakan grid 12-kolom dan kontainer bento terstruktur dengan batas maksimal lebar `max-w-[1440px]`.
+* **Zero Artificial Gradients:** Permukaan status memakai tint semantik datar, bukan gradien marketing. Skor kesehatan adalah ring conic fungsional, bukan dekorasi.
+* **Fixed Desktop Shell:** Layar terkunci di `h-screen overflow-hidden`. Rail dan topbar tetap, area workspace scroll independen.
+* **Typographic Stability:** Angka telemetri, suhu, persentase, dan alamat register memakai `tabular-nums` serta font monospace; body copy memakai Segoe UI Variable.
+* **Visualisasi Data-First:** Peta LBA 40 kolom, sphere kondisi S.M.A.R.T, dan segmented bar storage memakai bentuk + label sehingga status tidak hanya bergantung pada warna.
+* **Interaksi Aksesibel:** Focus-visible ring, ARIA label, tooltip pada navigasi collapsed, dukungan reduced motion, dan target kontrol desktop 32–44 px.
 * **Zero Emojis in Controls:** Tombol navigasi dan toolbar hanya menggunakan ikon vektor SVG presisi dari Lucide Icons.
 
 ---

@@ -378,16 +378,22 @@ function setLanguage(lang, triggerRender = true) {
   const btnId = document.getElementById('btn-lang-id');
   const btnEn = document.getElementById('btn-lang-en');
 
-  if (lang === 'en') {
-    btnEn.className = 'px-2 py-0.5 rounded font-bold transition-all bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs';
-    btnId.className = 'px-2 py-0.5 rounded font-bold transition-all text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100';
-  } else {
-    btnId.className = 'px-2 py-0.5 rounded font-bold transition-all bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs';
-    btnEn.className = 'px-2 py-0.5 rounded font-bold transition-all text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100';
+    if (btnEn) {
+    btnEn.classList.toggle('is-active', lang === 'en');
+    btnEn.setAttribute('aria-pressed', lang === 'en' ? 'true' : 'false');
+  }
+  if (btnId) {
+    btnId.classList.toggle('is-active', lang === 'id');
+    btnId.setAttribute('aria-pressed', lang === 'id' ? 'true' : 'false');
   }
 
   const t = I18N[lang];
-  document.getElementById('header-subtitle').textContent = t.appSubtitle;
+  const subtitle = document.getElementById('header-subtitle');
+  if (subtitle) {
+    subtitle.textContent = lang === 'en'
+      ? 'Evidence first. Never invent telemetry.'
+      : 'Bukti dulu. Tidak mengarang telemetri.';
+  }
   document.getElementById('txt-installed-disks').textContent = t.installedDisks;
   document.getElementById('txt-mode-layman').textContent = t.modeLayman;
   document.getElementById('txt-mode-tech').textContent = t.modeTech;
@@ -401,6 +407,16 @@ function setLanguage(lang, triggerRender = true) {
   document.getElementById('txt-refresh').textContent = t.refresh;
   const exportLabel = document.getElementById('txt-export-report');
   if (exportLabel) exportLabel.textContent = currentLang === 'en' ? 'Export' : 'Ekspor';
+  const logsLabel = document.getElementById('txt-btn-logs');
+  if (logsLabel) logsLabel.textContent = currentLang === 'en' ? 'Logs' : 'Log';
+  const topbarEyebrow = document.getElementById('topbar-eyebrow');
+  if (topbarEyebrow) topbarEyebrow.textContent = currentLang === 'en' ? 'Active drive' : 'Drive aktif';
+  const sideWorkspace = document.getElementById('lbl-sidebar-workspace');
+  if (sideWorkspace) sideWorkspace.textContent = currentLang === 'en' ? 'Workspace' : 'Ruang kerja';
+  const sideTools = document.getElementById('lbl-sidebar-tools');
+  if (sideTools) sideTools.textContent = currentLang === 'en' ? 'Tools' : 'Alat';
+  const sidePreferences = document.getElementById('lbl-sidebar-preferences');
+  if (sidePreferences) sidePreferences.textContent = currentLang === 'en' ? 'Preferences' : 'Preferensi';
 
   const storageLabels = {
     'txt-btn-storage-scan': ['Scan Disk', 'Pindai Disk'],
@@ -575,28 +591,41 @@ function setMode(mode) {
   const viewScanner = document.getElementById('view-scanner');
   const viewStorage = document.getElementById('view-storage');
 
-  const activeClass = 'flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-all bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs';
-  const inactiveClass = 'flex items-center gap-1.5 px-3 py-1 rounded font-semibold transition-all text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100';
-
-  if (btnLayman) btnLayman.className = mode === 'layman' ? activeClass : inactiveClass;
-  if (btnTech) btnTech.className = mode === 'tech' ? activeClass : inactiveClass;
-  if (btnScanner) btnScanner.className = mode === 'scanner' ? activeClass : inactiveClass;
-  if (btnStorage) btnStorage.className = mode === 'storage' ? activeClass : inactiveClass;
+  const navItems = {
+    layman: btnLayman,
+    tech: btnTech,
+    scanner: btnScanner,
+    storage: btnStorage,
+  };
+  Object.entries(navItems).forEach(([key, button]) => {
+    if (!button) return;
+    const isActive = key === mode;
+    button.classList.toggle('is-active', isActive);
+    if (isActive) {
+      button.setAttribute('aria-current', 'page');
+    } else {
+      button.removeAttribute('aria-current');
+    }
+  });
 
   if (viewLayman) viewLayman.classList.toggle('hidden', mode !== 'layman');
   if (viewTech) viewTech.classList.toggle('hidden', mode !== 'tech');
   if (viewScanner) viewScanner.classList.toggle('hidden', mode !== 'scanner');
   if (viewStorage) viewStorage.classList.toggle('hidden', mode !== 'storage');
 
-  // Storage mode is a workspace of its own: hide drive hero/selector clutter.
-  const focusStorage = mode === 'storage';
-  ['drive-selector-section', 'disk-hero-section', 'telemetry-gap-banner'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.classList.toggle('hidden', focusStorage);
-  });
+  // Each mode owns its workspace. The large hero is reserved for Summary.
+  const isSummary = mode === 'layman';
+  const isStorage = mode === 'storage';
+  const heroSection = document.getElementById('disk-hero-section');
+  if (heroSection) heroSection.classList.toggle('hidden', !isSummary);
+  const driveSelector = document.getElementById('drive-selector-section');
+  if (driveSelector) driveSelector.classList.toggle('hidden', isStorage);
+  const gapBanner = document.getElementById('telemetry-gap-banner');
+  if (gapBanner) gapBanner.classList.toggle('hidden', !isSummary);
   const maskingBanner = document.getElementById('masking-banner');
-  if (maskingBanner && focusStorage) maskingBanner.classList.add('hidden');
-  if (!focusStorage && allDisks.length > 0) {
+  if (maskingBanner && !isSummary) maskingBanner.classList.add('hidden');
+
+  if (allDisks.length > 0) {
     renderActiveDisk();
   }
 
@@ -646,17 +675,17 @@ async function fetchDisksData(isRefresh = false) {
 
     if (isAdminMode) {
       if (adminBanner) adminBanner.classList.add('hidden');
-      if (adminDot) adminDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+      if (adminDot) adminDot.className = 'admin-dot is-ok';
       if (lblAdmin) {
         lblAdmin.textContent = 'Admin OK';
-        lblAdmin.className = 'text-[11px] font-medium text-emerald-600 dark:text-emerald-400 font-mono';
+        lblAdmin.className = 'sidebar-admin-text is-ok';
       }
     } else {
       if (adminBanner) adminBanner.classList.remove('hidden');
-      if (adminDot) adminDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+      if (adminDot) adminDot.className = 'admin-dot is-warn';
       if (lblAdmin) {
         lblAdmin.textContent = 'Non-Admin';
-        lblAdmin.className = 'text-[11px] font-medium text-amber-600 dark:text-amber-400 font-mono';
+        lblAdmin.className = 'sidebar-admin-text is-warn';
       }
     }
 
@@ -723,7 +752,7 @@ function renderDriveTabs() {
     const mediaBadge = hw.cell_tech_name ? (hw.cell_tech_name.includes('TLC') ? 'TLC' : (hw.cell_tech_name.includes('QLC') ? 'QLC' : (hw.cell_tech_name.includes('SMR') ? 'SMR' : disk.bus_type))) : disk.bus_type;
 
     return `
-      <div onclick="selectDisk(${idx})" class="disk-tab-card ${isActive ? 'active' : ''}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectDisk(${idx});}">
+      <div onclick="selectDisk(${idx})" class="disk-tab-card ${isActive ? 'active' : ''}" role="button" tabindex="0" title="${escapeHtml(disk.name)} · ${escapeHtml(driveLetters)} · ${escapeHtml(String(disk.size_gb || 'N/A'))} GB" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectDisk(${idx});}">
         <div class="flex items-start justify-between gap-2">
           <div class="space-y-0.5 truncate">
             <div class="flex items-center gap-1.5">
@@ -774,6 +803,34 @@ function renderActiveDisk() {
   const source = getDataSourceMeta(disk);
   const gaps = Array.isArray(disk.data_gaps) ? disk.data_gaps : [];
 
+  const topName = document.getElementById('topbar-disk-name');
+  const topMeta = document.getElementById('topbar-disk-meta');
+  const topChip = document.getElementById('topbar-health-chip');
+  const topSource = document.getElementById('topbar-source-badge');
+  const topUpdated = document.getElementById('topbar-updated');
+  if (topName) topName.textContent = disk.name;
+  if (topMeta) {
+    const size = disk.size_gb ? `${disk.size_gb} GB` : 'size N/A';
+    topMeta.textContent = `${size} · ${disk.media_type || 'N/A'} / ${disk.bus_type || 'N/A'} · ${disk.drive_letters_str || '-'}`;
+  }
+  if (topChip) {
+    topChip.textContent = trueHealth === null
+      ? (currentLang === 'en' ? 'HEALTH N/A' : 'KESEHATAN N/A')
+      : `${trueHealth}% ${currentLang === 'en' ? 'TRUE HEALTH' : 'KESEHATAN'}`;
+    topChip.className = 'topbar-chip';
+    if (trueHealth === null) topChip.classList.add('is-unknown');
+    else if (trueHealth < 60) topChip.classList.add('is-bad');
+    else if (trueHealth < 90 || isMasking) topChip.classList.add('is-warn');
+    else topChip.classList.add('is-good');
+  }
+  if (topSource) {
+    topSource.textContent = source.label;
+    topSource.title = source.detail;
+  }
+  if (topUpdated) {
+    topUpdated.textContent = `${currentLang === 'en' ? 'Updated' : 'Diperbarui'}: ${new Date().toLocaleTimeString()}`;
+  }
+
   const sourceBadge = document.getElementById('disk-data-source-badge');
   if (sourceBadge) {
     sourceBadge.textContent = source.label;
@@ -784,7 +841,7 @@ function renderActiveDisk() {
   const gapText = document.getElementById('telemetry-gap-text');
   const gapBadge = document.getElementById('telemetry-source-badge');
   if (gapBanner && gapText) {
-    if ((source.key === 'unavailable' || gaps.length > 0) && currentMode !== 'storage') {
+    if ((source.key === 'unavailable' || gaps.length > 0) && currentMode === 'layman') {
       gapBanner.classList.remove('hidden');
       gapText.textContent = gaps.length > 0
         ? `${source.detail} · Data tidak tersedia: ${gaps.join(', ')}`
@@ -801,7 +858,7 @@ function renderActiveDisk() {
   // Masking Banner
   const maskingBanner = document.getElementById('masking-banner');
   const maskingText = document.getElementById('masking-text');
-  if (isMasking && currentMode !== 'storage') {
+  if (isMasking && currentMode === 'layman') {
     maskingBanner.classList.remove('hidden');
     maskingText.textContent = currentLang === 'en' 
       ? (ha.masking_explanation_en || ha.masking_explanation_id || '')
@@ -831,18 +888,16 @@ function renderActiveDisk() {
     cdiClaimVal.textContent = reportedHealth === null ? 'N/A' : `${reportedHealth}%`;
   }
 
-  badgeHealth.className = 'w-44 py-2.5 px-3 rounded-lg flex flex-col items-center justify-center text-center select-none shadow-xs border transition-all';
+  const orbitTone = trueHealth === null ? 'unknown' : (trueHealth < 60 ? 'bad' : (trueHealth < 90 || isMasking ? 'caution' : 'good'));
+  badgeHealth.className = `health-orbit health-orbit--${orbitTone} select-none`;
+  badgeHealth.style.setProperty('--health', `${trueHealth === null ? 0 : trueHealth}%`);
   if (trueHealth === null) {
-    badgeHealth.classList.add('bg-zinc-100', 'dark:bg-zinc-800', 'border-zinc-300', 'dark:border-zinc-700', 'text-zinc-700', 'dark:text-zinc-200');
     badgeLabel.textContent = currentLang === 'en' ? 'Unknown' : 'Tidak Diketahui';
   } else if (trueHealth < 60) {
-    badgeHealth.classList.add('health-badge-bad', 'border-rose-600');
     badgeLabel.textContent = t.statusBad;
   } else if (trueHealth < 90 || isMasking) {
-    badgeHealth.classList.add('health-badge-caution', 'border-amber-500');
     badgeLabel.textContent = t.statusCaution;
   } else {
-    badgeHealth.classList.add('health-badge-good', 'border-emerald-600');
     badgeLabel.textContent = t.statusGood;
   }
 
@@ -942,6 +997,9 @@ function renderActiveDisk() {
     : 'N/A';
   document.getElementById('spec-reads').textContent = hostReadsTb;
   document.getElementById('spec-writes').textContent = hostWritesTb;
+  document.querySelectorAll('#disk-hero-section .spec-value').forEach((el) => {
+    el.title = el.textContent;
+  });
 
   // 4 Pillars Flash & Hardware Grid
   const elHwNand = document.getElementById('hw-nand-type');
@@ -1692,13 +1750,13 @@ function renderStorageDriveDropdown() {
 
   // 1. Synchronize hidden native select
   if (select) {
-    select.innerHTML = '<option value="all">Semua Disk (All Disks)</option>';
+    select.innerHTML = `<option value="all">${txt('All drives', 'Semua disk')}</option>`;
     storageDrives.forEach((drv) => {
       const opt = document.createElement('option');
       opt.value = drv.drive;
       const freeStr = formatStorageBytes(drv.free);
       const totalStr = formatStorageBytes(drv.total);
-      opt.textContent = `${drv.drive} (${freeStr} bebas / ${totalStr})`;
+      opt.textContent = `${drv.drive} (${freeStr} ${txt('free', 'bebas')} / ${totalStr})`;
       select.appendChild(opt);
     });
     select.value = currentVal;
@@ -1718,14 +1776,14 @@ function renderStorageDriveDropdown() {
         <div class="flex items-center gap-2.5 truncate">
           <i data-lucide="hard-drive" class="w-4 h-4 text-blue-500 shrink-0"></i>
           <div class="text-left">
-            <div class="font-mono font-bold text-zinc-900 dark:text-zinc-100">Semua Disk</div>
-            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 font-sans">Pindai seluruh kapasitas penyimpanan komputer</div>
+            <div class="font-mono font-bold text-zinc-900 dark:text-zinc-100">${txt('All drives', 'Semua disk')}</div>
+            <div class="text-[10px] text-zinc-500 dark:text-zinc-400 font-sans">${txt('Scan all storage capacity on this computer', 'Pindai seluruh kapasitas penyimpanan komputer')}</div>
           </div>
         </div>
         ${isAllActive ? '<i data-lucide="check" class="w-4 h-4 text-blue-500 shrink-0"></i>' : ''}
       </button>`;
 
-    let activeLabelText = 'Semua Disk (All Disks)';
+    let activeLabelText = txt('All drives', 'Semua disk');
 
     // Individual Drives
     storageDrives.forEach((drv) => {
@@ -1735,7 +1793,7 @@ function renderStorageDriveDropdown() {
       const pctUsed = drv.percent || drv.percent_used || 0;
 
       if (isDriveActive) {
-        activeLabelText = `${drv.drive} (${freeStr} bebas / ${totalStr})`;
+        activeLabelText = `${drv.drive} (${freeStr} ${txt('free', 'bebas')} / ${totalStr})`;
       }
 
       listHtml += `
@@ -1745,9 +1803,9 @@ function renderStorageDriveDropdown() {
             <div class="text-left">
               <div class="flex items-center gap-1.5 font-mono">
                 <span class="font-bold text-zinc-900 dark:text-zinc-100">${escapeHtml(drv.drive)}</span>
-                <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">${freeStr} bebas</span>
+                <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">${freeStr} ${txt('free', 'bebas')}</span>
               </div>
-              <div class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">Total ${totalStr} · Terpakai ${pctUsed}%</div>
+              <div class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">${txt('Total', 'Total')} ${totalStr} · ${txt('Used', 'Terpakai')} ${pctUsed}%</div>
             </div>
           </div>
           ${isDriveActive ? '<i data-lucide="check" class="w-4 h-4 text-blue-500 shrink-0"></i>' : ''}
@@ -1969,7 +2027,7 @@ function updateStorageProgressBar(st) {
   if (pCount) {
     const filesStr = (st.files_scanned || 0).toLocaleString();
     const bytesStr = formatStorageBytes(st.bytes_scanned || 0);
-    pCount.textContent = `${filesStr} berkas (${bytesStr})`;
+    pCount.textContent = `${filesStr} ${txt('files', 'berkas')} (${bytesStr})`;
   }
 }
 
@@ -2902,7 +2960,7 @@ async function toggleRecommendationFolderExpand(idx, path) {
     panel.classList.remove('hidden');
     chevron.classList.add('rotate-90');
     chevron.classList.add('text-blue-500');
-    if (lbl) lbl.textContent = 'Tutup isi folder';
+    if (lbl) lbl.textContent = txt('Close folder contents', 'Tutup isi folder');
 
     if (expandedFoldersCache.has(path)) {
       renderFolderFileList(content, expandedFoldersCache.get(path));
@@ -2912,7 +2970,7 @@ async function toggleRecommendationFolderExpand(idx, path) {
     content.innerHTML = `
       <div class="flex items-center gap-2.5 text-xs text-zinc-500 dark:text-zinc-400 py-3 px-2 justify-center font-mono">
         <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-500"></i>
-        <span>Memindai daftar berkas di dalam folder...</span>
+        <span>${txt('Reading folder contents...', 'Memindai daftar berkas di dalam folder...')}</span>
       </div>`;
     safeCreateIcons();
 
@@ -2925,20 +2983,20 @@ async function toggleRecommendationFolderExpand(idx, path) {
       } else {
         content.innerHTML = `
           <div class="p-3 text-xs text-rose-500 font-mono bg-rose-500/10 rounded border border-rose-500/20">
-            Gagal membaca folder: ${escapeHtml(data.error || 'Akses ditolak atau folder tidak ditemukan.')}
+            ${txt('Could not read folder: ', 'Gagal membaca folder: ')}${escapeHtml(data.error || 'Akses ditolak atau folder tidak ditemukan.')}
           </div>`;
       }
     } catch (err) {
       content.innerHTML = `
         <div class="p-3 text-xs text-rose-500 font-mono bg-rose-500/10 rounded border border-rose-500/20">
-          Kesalahan jaringan saat memindai: ${escapeHtml(err.message)}
+          ${txt('Network error while reading: ', 'Kesalahan jaringan saat memindai: ')}${escapeHtml(err.message)}
         </div>`;
     }
   } else {
     panel.classList.add('hidden');
     chevron.classList.remove('rotate-90');
     chevron.classList.remove('text-blue-500');
-    if (lbl) lbl.textContent = 'Klik untuk lihat isi';
+    if (lbl) lbl.textContent = txt('Inspect contents', 'Lihat isi');
   }
 }
 
@@ -2964,7 +3022,7 @@ async function toggleLargeFolderExpand(idx, path) {
     content.innerHTML = `
       <div class="flex items-center gap-2.5 text-xs text-zinc-500 dark:text-zinc-400 py-3 px-2 justify-center font-mono">
         <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-500"></i>
-        <span>Memindai daftar berkas di dalam folder...</span>
+        <span>${txt('Reading folder contents...', 'Memindai daftar berkas di dalam folder...')}</span>
       </div>`;
     safeCreateIcons();
 
@@ -2977,13 +3035,13 @@ async function toggleLargeFolderExpand(idx, path) {
       } else {
         content.innerHTML = `
           <div class="p-3 text-xs text-rose-500 font-mono bg-rose-500/10 rounded border border-rose-500/20">
-            Gagal membaca folder: ${escapeHtml(data.error || 'Akses ditolak atau folder tidak ditemukan.')}
+            ${txt('Could not read folder: ', 'Gagal membaca folder: ')}${escapeHtml(data.error || 'Akses ditolak atau folder tidak ditemukan.')}
           </div>`;
       }
     } catch (err) {
       content.innerHTML = `
         <div class="p-3 text-xs text-rose-500 font-mono bg-rose-500/10 rounded border border-rose-500/20">
-          Kesalahan jaringan saat memindai: ${escapeHtml(err.message)}
+          ${txt('Network error while reading: ', 'Kesalahan jaringan saat memindai: ')}${escapeHtml(err.message)}
         </div>`;
     }
   } else {
@@ -3001,7 +3059,7 @@ function renderFolderFileList(container, data) {
   if (items.length === 0) {
     container.innerHTML = `
       <div class="py-3 px-2 text-center text-xs text-zinc-400 font-mono">
-        Folder ini kosong (0 berkas).
+        ${txt('This folder is empty (0 files).', 'Folder ini kosong (0 berkas).')}
       </div>`;
     return;
   }
@@ -3010,11 +3068,11 @@ function renderFolderFileList(container, data) {
     <div class="space-y-2">
       <div class="flex items-center justify-between text-[11px] font-mono text-zinc-500 dark:text-zinc-400 pb-1.5 border-b border-zinc-200 dark:border-zinc-800 flex-wrap gap-2">
         <div class="flex items-center gap-2">
-          <span class="font-bold text-zinc-800 dark:text-zinc-200">${data.total_items} item teratas</span>
+          <span class="font-bold text-zinc-800 dark:text-zinc-200">${txt(`${data.total_items} top items`, `${data.total_items} item teratas`)}</span>
           <span>•</span>
-          <span class="text-zinc-500">${data.total_files} berkas (${data.total_bytes_formatted}), ${data.total_dirs} sub-folder</span>
+          <span class="text-zinc-500">${txt(`${data.total_files} files (${data.total_bytes_formatted}), ${data.total_dirs} sub-folders`, `${data.total_files} berkas (${data.total_bytes_formatted}), ${data.total_dirs} sub-folder`)}</span>
         </div>
-        <span class="text-[10px] text-zinc-400">Urut dari ukuran terbesar</span>
+        <span class="text-[10px] text-zinc-400">${txt('Sorted by largest size', 'Urut dari ukuran terbesar')}</span>
       </div>
 
       <div class="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scroll">`;
