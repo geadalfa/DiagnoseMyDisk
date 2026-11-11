@@ -10,6 +10,7 @@ import time
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -210,6 +211,93 @@ class TestStorageManagerEngine(unittest.TestCase):
         self._scan()
         result = self.mgr.inspect_directory(self.test_dir, enforce_allowlist=True)
         self.assertTrue(result["success"])
+
+
+class TestCleanupRecommendationDriveScoping(unittest.TestCase):
+    """Recommendations must belong to the drive roots that were actually scanned."""
+
+    def setUp(self):
+        self.target_dir = tempfile.mkdtemp(prefix="diagnose_scope_target_")
+        self.cache_dir = tempfile.mkdtemp(prefix="diagnose_scope_cache_")
+        self.local_app_data = os.path.join(self.cache_dir, "AppData", "Local")
+        self.downloads_dir = os.path.join(self.cache_dir, "Downloads")
+        self.program_data = os.path.join(self.cache_dir, "ProgramData")
+        self.temp_dir = os.path.join(self.local_app_data, "Temp")
+
+        self._write_payload(os.path.join(self.local_app_data, "npm-cache", "package.tgz"))
+        self._write_payload(os.path.join(self.local_app_data, "uv", "cache", "archive-v0", "archive.bin"))
+        self._write_payload(os.path.join(self.local_app_data, "pip", "cache", "wheel.whl"))
+        self._write_payload(os.path.join(self.downloads_dir, "big-download.iso"))
+        self._write_payload(os.path.join(
+            self.program_data,
+            "NVIDIA Corporation", "NVIDIA app", "UpdateFramework", "ota-artifacts", "grd", "installer.exe",
+        ))
+        self._write_payload(os.path.join(self.temp_dir, "session.tmp"))
+
+        self.env = {
+            "USERPROFILE": self.cache_dir,
+            "LOCALAPPDATA": self.local_app_data,
+            "ProgramData": self.program_data,
+            "TEMP": self.temp_dir,
+            "TMP": self.temp_dir,
+        }
+        self.mgr = StorageManager()
+
+    def tearDown(self):
+        shutil.rmtree(self.target_dir, ignore_errors=True)
+        shutil.rmtree(self.cache_dir, ignore_errors=True)
+
+    @staticmethod
+    def _write_payload(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(b"x" * (2 * 1024 * 1024))
+
+    @staticmethod
+    def _drive_entry(root):
+        return {
+            "drive": root,
+            "root": root,
+            "mount": root,
+            "total": 0,
+            "used": 0,
+            "free": 0,
+            "percent_used": 0,
+            "percent": 0,
+        }
+
+    def test_collect_excludes_paths_outside_scanned_root(self):
+        with patch.dict(os.environ, self.env):
+            recs = self.mgr._collect_cleanup_recommendations([self._drive_entry(self.target_dir)])
+        self.assertEqual(recs, [])
+
+    def test_collect_includes_paths_inside_scanned_root(self):
+        with patch.dict(os.environ, self.env):
+            recs = self.mgr._collect_cleanup_recommendations([self._drive_entry(self.cache_dir)])
+        ids = {rec["id"] for rec in recs}
+        for expected in ("npm_cache", "uv_cache", "pip_cache", "downloads_folder", "nvidia_ota", "user_temp"):
+            self.assertIn(expected, ids)
+        for rec in recs:
+            self.assertTrue(rec["path"].lower().startswith(self.cache_dir.lower()))
+
+    def test_scan_worker_scopes_recommendations_to_target(self):
+        with patch.dict(os.environ, self.env):
+            self.mgr._run_scan_worker(
+                [self.target_dir],
+                scan_duplicates=False,
+                min_large_mb=0,
+                include_recommendations=True,
+            )
+        results = self.mgr.get_results()
+        self.assertEqual(results["status"], "ok")
+        self.assertEqual(results["recommendations"], [])
+        self.assertEqual(results["breakdown"]["recommendations_cleanable"], 0)
+
+        fake_cache = os.path.join(self.local_app_data, "npm-cache")
+        clean_result = self.mgr.clean_paths([fake_cache])
+        self.assertTrue(os.path.isdir(fake_cache))
+        self.assertEqual(clean_result["deleted_count"], 0)
+        self.assertEqual(len(clean_result["rejected"]), 1)
 
 
 if __name__ == "__main__":

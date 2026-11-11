@@ -83,6 +83,11 @@ def _is_drive_root(path):
     return bool(drive) and tail in ("\\", "/", "")
 
 
+def _is_within_target_drives(path, target_drives):
+    """True when path belongs to one of the drive roots selected for the scan."""
+    return any(_is_within(path, drv.get("root")) for drv in target_drives if drv.get("root"))
+
+
 def _is_protected_dir(path):
     if _is_drive_root(path):
         return True
@@ -845,6 +850,8 @@ class StorageManager:
 
         for item in check_targets:
             p = item["path"]
+            if not _is_within_target_drives(p, target_drives):
+                continue
             if os.path.exists(p):
                 sz = self._calculate_path_size(p, time_budget=2.5)
                 if sz > 1024 * 1024:  # Minimal 1 MB agar relevan
