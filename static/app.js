@@ -136,6 +136,18 @@ const I18N = {
     modalGlossarySubtitle: 'Penjelasan mendalam tentang QLC, TLC, MLC, SLC, DRAM, HMB, TRIM & SMR',
     modalFooterTip: 'Tekan Esc atau klik tombol untuk menutup',
     modalBtnClose: 'Tutup Panduan',
+    autoUpdateLabel: 'Pembaruan otomatis',
+    autoUpdateTitle: 'Periksa pembaruan secara otomatis dari GitHub',
+    checkUpdateTitle: 'Periksa rilis terbaru di GitHub',
+    checkUpdates: 'Cek pembaruan',
+    checkingUpdates: 'Memeriksa...',
+    updateAvailable: 'Pembaruan Tersedia:',
+    updateUpToDate: 'DiagnoseMyDisk sudah versi terbaru',
+    updateReady: 'Pembaruan Siap Dipasang',
+    updateDownloading: 'Mengunduh pembaruan...',
+    updateNow: 'Perbarui Sekarang',
+    installRestart: 'Pasang & Mulai Ulang',
+    updateInstalling: 'Menjalankan installer...',
   },
   en: {
     appSubtitle: 'True Health Verification, Bad Sector Scan & S.M.A.R.T Telemetry',
@@ -240,6 +252,18 @@ const I18N = {
     modalGlossarySubtitle: 'Deep dive into QLC, TLC, MLC, SLC, DRAM, HMB, TRIM & SMR',
     modalFooterTip: 'Press Esc or click button to close',
     modalBtnClose: 'Close Guide',
+    autoUpdateLabel: 'Auto-update',
+    autoUpdateTitle: 'Check for updates automatically from GitHub',
+    checkUpdateTitle: 'Check GitHub for latest release',
+    checkUpdates: 'Check for updates',
+    checkingUpdates: 'Checking...',
+    updateAvailable: 'Update Available:',
+    updateUpToDate: 'DiagnoseMyDisk is up to date',
+    updateReady: 'Update Ready to Install',
+    updateDownloading: 'Downloading update...',
+    updateNow: 'Update Now',
+    installRestart: 'Restart & Install',
+    updateInstalling: 'Launching installer...',
   }
 };
 
@@ -669,6 +693,10 @@ function setLanguage(lang, triggerRender = true) {
   if (sideTools) sideTools.textContent = currentLang === 'en' ? 'Tools' : 'Alat';
   const sidePreferences = document.getElementById('lbl-sidebar-preferences');
   if (sidePreferences) sidePreferences.textContent = currentLang === 'en' ? 'Preferences' : 'Preferensi';
+  const lblAutoUpdate = document.getElementById('lbl-auto-update');
+  if (lblAutoUpdate) lblAutoUpdate.textContent = t.autoUpdateLabel || (currentLang === 'en' ? 'Auto-update' : 'Pembaruan otomatis');
+  const txtCheckUpdates = document.getElementById('txt-check-updates');
+  if (txtCheckUpdates) txtCheckUpdates.textContent = t.checkUpdates || (currentLang === 'en' ? 'Check for updates' : 'Cek pembaruan');
 
   const storageLabels = {
     'txt-btn-storage-scan': ['Scan Disk', 'Pindai Disk'],
@@ -798,21 +826,218 @@ function setLanguage(lang, triggerRender = true) {
   }
 }
 
-// Background preferences synchronization (v3.0.0)
+// Background preferences synchronization (v3.0.0 & v3.2.1)
 async function syncServerPreferences() {
   try {
     const res = await apiFetch('/api/preferences');
     const data = await res.json();
-    if (data.success && data.preferences && data.preferences.language) {
-      const serverLang = data.preferences.language;
-      if (serverLang !== currentLang && (serverLang === 'en' || serverLang === 'id')) {
-        setLanguage(serverLang, true);
+    if (data.success && data.preferences) {
+      if (data.preferences.language) {
+        const serverLang = data.preferences.language;
+        if (serverLang !== currentLang && (serverLang === 'en' || serverLang === 'id')) {
+          setLanguage(serverLang, true);
+        }
+      }
+      if (data.preferences.auto_update !== undefined) {
+        const chk = document.getElementById('chk-auto-update');
+        if (chk) chk.checked = Boolean(data.preferences.auto_update);
       }
     }
   } catch (err) {
     // Fail silently to local storage
   }
 }
+
+// ==============================================================================
+// GITHUB AUTO-UPDATE & CHECK ENGINE (DiagnoseMyDisk)
+// ==============================================================================
+let currentUpdateInfo = null;
+let updatePollingTimer = null;
+
+function toggleAutoUpdate(enable) {
+  apiFetch('/api/preferences', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ auto_update: enable })
+  }).catch(() => {});
+}
+
+async function checkForUpdates(manual = false) {
+  const icon = document.getElementById('icon-check-updates');
+  const txt = document.getElementById('txt-check-updates');
+  const t = I18N[currentLang] || I18N.en;
+
+  if (icon) icon.classList.add('animate-spin');
+  if (txt && manual) txt.textContent = t.checkingUpdates || 'Checking...';
+
+  try {
+    const res = await apiFetch('/api/update/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ force: manual })
+    });
+    const data = await res.json();
+
+    if (icon) icon.classList.remove('animate-spin');
+    if (txt) txt.textContent = t.checkUpdates || (currentLang === 'en' ? 'Check for updates' : 'Cek pembaruan');
+
+    if (data.status === 'available' || data.update_available) {
+      currentUpdateInfo = data;
+      renderUpdateBanner(data);
+      const dot = document.getElementById('badge-update-dot');
+      if (dot) dot.classList.remove('hidden');
+    } else if (data.status === 'ready_to_install') {
+      currentUpdateInfo = data;
+      renderUpdateBanner(data);
+    } else if (data.status === 'up_to_date') {
+      const dot = document.getElementById('badge-update-dot');
+      if (dot) dot.classList.add('hidden');
+      if (manual) {
+        showToast(t.updateUpToDate || 'DiagnoseMyDisk is up to date.');
+      }
+    } else if (data.status === 'error' && manual) {
+      showToast(data.error || 'Failed to check updates.', 'error');
+    }
+  } catch (err) {
+    if (icon) icon.classList.remove('animate-spin');
+    if (txt) txt.textContent = t.checkUpdates || (currentLang === 'en' ? 'Check for updates' : 'Cek pembaruan');
+    if (manual) {
+      showToast('Network error while checking updates.', 'error');
+    }
+  }
+}
+
+function renderUpdateBanner(info) {
+  const banner = document.getElementById('update-notification-banner');
+  if (!banner) return;
+
+  const t = I18N[currentLang] || I18N.en;
+  const versionEl = document.getElementById('update-banner-version');
+  const titleEl = document.getElementById('update-banner-title');
+  const descEl = document.getElementById('update-banner-desc');
+  const actionBtn = document.getElementById('btn-update-action');
+  const actionTxt = document.getElementById('txt-update-action');
+  const progressContainer = document.getElementById('update-progress-container');
+
+  const release = info.release_info || {};
+  const newVer = info.latest_version || release.version || 'New';
+  if (versionEl) versionEl.textContent = `v${newVer}`;
+
+  if (info.status === 'ready_to_install' || info.installer_ready) {
+    if (titleEl) titleEl.textContent = t.updateReady || 'Update Ready to Install:';
+    if (descEl) descEl.textContent = currentLang === 'en' ? 'Installer downloaded. Restart to apply.' : 'Installer terunduh. Mulai ulang untuk memasang.';
+    if (actionTxt) actionTxt.textContent = t.installRestart || 'Restart & Install';
+    if (progressContainer) progressContainer.classList.add('hidden');
+    if (actionBtn) {
+      actionBtn.classList.remove('hidden');
+      actionBtn.disabled = false;
+    }
+  } else if (info.status === 'downloading') {
+    if (titleEl) titleEl.textContent = t.updateDownloading || 'Downloading Update:';
+    if (descEl) descEl.textContent = `${info.progress || 0}%`;
+    if (progressContainer) {
+      progressContainer.classList.remove('hidden');
+      progressContainer.classList.add('flex');
+    }
+    const bar = document.getElementById('update-progress-bar');
+    const ptxt = document.getElementById('update-progress-text');
+    if (bar) bar.style.width = `${info.progress || 0}%`;
+    if (ptxt) ptxt.textContent = `${info.progress || 0}%`;
+    if (actionBtn) actionBtn.classList.add('hidden');
+  } else {
+    // available
+    if (titleEl) titleEl.textContent = t.updateAvailable || 'Update Available:';
+    if (descEl) descEl.textContent = release.body ? release.body.slice(0, 100) : (currentLang === 'en' ? 'A new version is available on GitHub.' : 'Versi baru tersedia di GitHub.');
+    if (actionTxt) actionTxt.textContent = t.updateNow || 'Update Now';
+    if (progressContainer) progressContainer.classList.add('hidden');
+    if (actionBtn) {
+      actionBtn.classList.remove('hidden');
+      actionBtn.disabled = false;
+    }
+  }
+
+  banner.classList.remove('hidden');
+  safeCreateIcons();
+}
+
+function dismissUpdateBanner() {
+  const banner = document.getElementById('update-notification-banner');
+  if (banner) banner.classList.add('hidden');
+}
+
+async function handleUpdateAction() {
+  const t = I18N[currentLang] || I18N.en;
+  const actionBtn = document.getElementById('btn-update-action');
+  const actionTxt = document.getElementById('txt-update-action');
+
+  if (!currentUpdateInfo) return;
+
+  if (currentUpdateInfo.status === 'ready_to_install' || currentUpdateInfo.installer_ready) {
+    if (actionBtn) actionBtn.disabled = true;
+    if (actionTxt) actionTxt.textContent = t.updateInstalling || 'Launching installer...';
+    try {
+      await apiFetch('/api/update/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ silent: false })
+      });
+      showToast(currentLang === 'en' ? 'Installer launched. DiagnoseMyDisk will close shortly.' : 'Installer dijalankan. DiagnoseMyDisk akan segera tertutup.', 'info');
+    } catch (e) {
+      showToast('Failed to apply update: ' + e, 'error');
+    }
+    return;
+  }
+
+  // If available, trigger download
+  if (actionBtn) actionBtn.disabled = true;
+  if (actionTxt) actionTxt.textContent = t.updateDownloading || 'Downloading...';
+  try {
+    const res = await apiFetch('/api/update/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const data = await res.json();
+    currentUpdateInfo = data;
+    renderUpdateBanner(data);
+    startPollingUpdateStatus();
+  } catch (err) {
+    showToast('Failed to start download: ' + err, 'error');
+  }
+}
+
+function startPollingUpdateStatus() {
+  if (updatePollingTimer) clearInterval(updatePollingTimer);
+  updatePollingTimer = setInterval(async () => {
+    try {
+      const res = await apiFetch('/api/update/status');
+      const data = await res.json();
+      currentUpdateInfo = data;
+      renderUpdateBanner(data);
+
+      if (data.status === 'ready_to_install' || data.installer_ready || data.status === 'error') {
+        clearInterval(updatePollingTimer);
+        updatePollingTimer = null;
+      }
+    } catch (err) {
+      clearInterval(updatePollingTimer);
+      updatePollingTimer = null;
+    }
+  }, 800);
+}
+
+// Periksa status update otomatis saat startup
+setTimeout(() => {
+  apiFetch('/api/update/status').then(r => r.json()).then(data => {
+    if (data.update_available || data.status === 'ready_to_install' || data.status === 'downloading') {
+      currentUpdateInfo = data;
+      renderUpdateBanner(data);
+      if (data.status === 'downloading') {
+        startPollingUpdateStatus();
+      }
+    }
+  }).catch(() => {});
+}, 3000);
 
 // Penangan Penggantian Tema (Gelap / Terang) Modern Anti-Slop
 function toggleTheme() {

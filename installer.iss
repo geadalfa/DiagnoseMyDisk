@@ -3,7 +3,7 @@
 ; Produces a standalone installer at installer_output\DiagnoseMyDisk_Setup.exe
 
 #define MyAppName "DiagnoseMyDisk"
-#define MyAppVersion "3.2.0"
+#define MyAppVersion "3.3.0"
 #define MyAppPublisher "Alfa & Gemi"
 #define MyAppExeName "DiagnoseMyDisk.exe"
 #define MyAppURL "https://github.com/geadalfa/DiagnoseMyDisk"
@@ -50,5 +50,35 @@ Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
+[Registry]
+Root: HKCU; Subkey: "SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"; ValueType: string; ValueName: "{app}\{#MyAppExeName}"; ValueData: "~ RUNASADMIN"; Flags: uninsdeletevalue
+
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Run {#MyAppName} now"; Flags: nowait postinstall skipifsilent
+
+[Code]
+procedure SetShortcutRunAsAdmin(const Filename: string);
+var
+  Buffer: AnsiString;
+begin
+  if FileExists(Filename) then
+  begin
+    if LoadStringFromFile(Filename, Buffer) then
+    begin
+      if Length(Buffer) > 21 then
+      begin
+        Buffer[22] := Chr(Ord(Buffer[22]) or $20);
+        SaveStringToFile(Filename, Buffer, False);
+      end;
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+  begin
+    SetShortcutRunAsAdmin(ExpandConstant('{autodesktop}\{#MyAppName}.lnk'));
+    SetShortcutRunAsAdmin(ExpandConstant('{group}\{#MyAppName}.lnk'));
+  end;
+end;

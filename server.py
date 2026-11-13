@@ -53,14 +53,20 @@ try:
     from backend import app_logger
 except ImportError:
     import app_logger
+try:
+    from backend import updater
+except ImportError:
+    import updater
 
 PORT = 5550
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-APP_VERSION = "3.2.0"
+APP_VERSION = "3.3.0"
 APP_TOKEN = secrets.token_urlsafe(32)
 MAX_BODY_BYTES = 1024 * 1024
 LOCAL_HOSTNAMES = {"127.0.0.1", "localhost"}
 DRIVE_TARGET_RE = re.compile(r"^[A-Za-z](?::[\\/]?|[\\/])?$")
+
+updater_instance = updater.UpdateManager(app_name="DiagnoseMyDisk", current_version=APP_VERSION)
 
 
 def normalize_drive_target(value):
@@ -83,19 +89,21 @@ PREFERENCES_FILE = os.path.join(
 )
 
 def get_user_preferences():
-    """Membaca pengaturan preferensi pengguna (default bahasa Inggris)."""
+    """Membaca pengaturan preferensi pengguna (default bahasa Inggris & auto-update aktif)."""
+    default_prefs = {"language": "en", "auto_update": True}
     try:
         if os.path.exists(PREFERENCES_FILE):
             with open(PREFERENCES_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
-                    return data
+                    default_prefs.update(data)
+                    return default_prefs
     except Exception:
         pass
-    return {"language": "en"}
+    return default_prefs
 
 def save_user_preferences(prefs):
-    """Menyimpan preferensi pengguna (seperti bahasa) ke file lokal."""
+    """Menyimpan preferensi pengguna (seperti bahasa & auto-update) ke file lokal."""
     try:
         os.makedirs(os.path.dirname(PREFERENCES_FILE), exist_ok=True)
         current = get_user_preferences()
@@ -343,6 +351,33 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 self._send_json({"success": False, "error": str(e)}, status=500)
             return
 
+        elif parsed_path.path == "/api/update/check":
+            try:
+                force = body_data.get("force", True) if isinstance(body_data, dict) else True
+                self._send_json(updater_instance.check_for_updates(force=force))
+            except Exception as e:
+                self._send_json({"status": "error", "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/update/download":
+            try:
+                url = body_data.get("download_url") if isinstance(body_data, dict) else None
+                self._send_json(updater_instance.start_download(url))
+            except Exception as e:
+                self._send_json({"status": "error", "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/update/apply":
+            try:
+                silent = bool(body_data.get("silent", False)) if isinstance(body_data, dict) else False
+                def _shutdown():
+                    time.sleep(0.5)
+                    os._exit(0)
+                self._send_json(updater_instance.apply_update(silent=silent, on_shutdown=_shutdown))
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
         elif parsed_path.path == "/api/clear_logs":
             try:
                 app_logger.clear_logs()
@@ -573,6 +608,15 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 self._send_json({"success": False, "error": str(e), "preferences": {"language": "en"}}, status=500)
             return
 
+        elif parsed_path.path == "/api/update/status":
+            self._send_json(updater_instance.get_status())
+            return
+
+        elif parsed_path.path == "/api/update/check":
+            force = qs.get("force", ["0"])[0] in ("1", "true", "True")
+            self._send_json(updater_instance.check_for_updates(force=force))
+            return
+
         elif parsed_path.path == "/api/logs":
             try:
                 recent = app_logger.get_recent_logs(300)
@@ -626,6 +670,28 @@ def launch_app_window(url):
     webbrowser.open(url)
 
 
+def ensure_admin_rights():
+    """Memastikan aplikasi berjalan dengan hak Administrator penuh.
+    Jika belum admin, luncurkan ulang dengan ShellExecute 'runas' untuk memicu pop-up UAC.
+    """
+    if os.name == "nt" and "--no-elevate" not in sys.argv and not os.environ.get("DMD_NO_ELEVATE"):
+        if not is_admin():
+            try:
+                if getattr(sys, "frozen", False):
+                    exe_path = sys.executable
+                    params = " ".join([f'"{arg}"' for arg in sys.argv[1:]])
+                else:
+                    exe_path = sys.executable
+                    params = f'"{os.path.abspath(__file__)}"'
+                    if len(sys.argv) > 1:
+                        params += " " + " ".join([f'"{arg}"' for arg in sys.argv[1:]])
+                ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe_path, params.strip(), None, 1)
+                if ret > 32:
+                    os._exit(0)
+            except Exception:
+                pass
+
+
 def is_server_already_running(port):
     """Cek apakah instans DiagnoseMyDisk lain sudah melayani port ini (tanpa mematikannya)."""
     try:
@@ -637,6 +703,9 @@ def is_server_already_running(port):
 
 
 def run_server():
+    # 0. Pastikan aplikasi berjalan sebagai Administrator (memicu pop-up UAC)
+    ensure_admin_rights()
+
     # 1. Cek apakah server sudah aktif di port 5550
     if is_server_already_running(PORT):
         launch_app_window(f"http://127.0.0.1:{PORT}")
@@ -644,6 +713,9 @@ def run_server():
 
     # 2. Mulai pre-warming cache di thread latar belakang
     threading.Thread(target=prewarm_cache, daemon=True).start()
+
+    # 3. Mulai auto-update background check (default ON di preferensi)
+    updater_instance.start_background_auto_update(get_user_preferences, delay=3.5, on_shutdown=lambda: os._exit(0))
 
     server_address = ("127.0.0.1", PORT)
     try:

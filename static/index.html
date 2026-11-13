@@ -32,7 +32,7 @@
   <!-- Offline Native Desktop Assets (Zero External CDN Dependency) -->
   <script src="tailwind.min.js"></script>
   <script src="lucide.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=3.2.0">
+  <link rel="stylesheet" href="style.css?v=3.3.0">
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -123,6 +123,20 @@
             <button id="btn-lang-en" onclick="setLanguage('en')" class="lang-button is-active">EN</button>
           </div>
         </div>
+        <div class="sidebar-pref-row mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-800/80">
+          <label class="flex items-center justify-between w-full text-xs cursor-pointer select-none" title="Check for updates automatically from GitHub" data-i18n-title="autoUpdateTitle">
+            <span class="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 font-medium">
+              <i data-lucide="cloud-download" class="w-3.5 h-3.5 text-zinc-500"></i>
+              <span id="lbl-auto-update">Auto-update</span>
+            </span>
+            <input type="checkbox" id="chk-auto-update" checked onchange="toggleAutoUpdate(this.checked)" class="accent-indigo-600 w-3.5 h-3.5 rounded cursor-pointer">
+          </label>
+        </div>
+        <button onclick="checkForUpdates(true)" id="btn-check-updates" class="app-nav-item app-nav-item--quiet mt-1.5 w-full text-left" title="Check GitHub for latest release" data-i18n-title="checkUpdateTitle">
+          <i data-lucide="refresh-cw" id="icon-check-updates" class="nav-icon"></i>
+          <span id="txt-check-updates" class="nav-label">Check for updates</span>
+          <span id="badge-update-dot" class="hidden w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-auto"></span>
+        </button>
       </div>
 
       <div class="sidebar-footer">
@@ -153,6 +167,35 @@
           </button>
         </div>
       </header>
+
+  <!-- UPDATE NOTIFICATION BANNER (Hidden by default, shown if update available or ready) -->
+  <div id="update-notification-banner" class="hidden shrink-0 bg-emerald-500/10 border-b border-emerald-500/30 px-4 py-2.5 text-xs text-emerald-950 dark:text-emerald-200">
+    <div class="max-w-[1440px] mx-auto flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0"></i>
+        <div class="truncate">
+          <span id="update-banner-title" class="font-semibold">Update Available:</span>
+          <span id="update-banner-version" class="font-mono bg-emerald-500/20 px-1.5 py-0.5 rounded ml-1 text-emerald-800 dark:text-emerald-300 font-bold">--</span>
+          <span id="update-banner-desc" class="ml-2 text-zinc-600 dark:text-zinc-400">A new version is ready.</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <div id="update-progress-container" class="hidden items-center gap-2">
+          <div class="w-24 bg-zinc-200 dark:bg-zinc-700 h-2 rounded-full overflow-hidden">
+            <div id="update-progress-bar" class="bg-emerald-600 h-full w-0 transition-all duration-300"></div>
+          </div>
+          <span id="update-progress-text" class="font-mono text-[11px]">0%</span>
+        </div>
+        <button id="btn-update-action" onclick="handleUpdateAction()" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer">
+          <i data-lucide="download" id="icon-update-action" class="w-3.5 h-3.5"></i>
+          <span id="txt-update-action">Update Now</span>
+        </button>
+        <button onclick="dismissUpdateBanner()" class="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded cursor-pointer" title="Dismiss">
+          <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- NON-ADMIN ELEVATION NOTICE (Hidden by default, shown if non-admin) -->
   <div id="non-admin-banner" class="hidden shrink-0 bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-900 dark:text-amber-200">
@@ -1267,6 +1310,6 @@
     </div>
   </div>
 
-    <script src="app.js?v=3.2.0"></script>
+    <script src="app.js?v=3.3.0"></script>
 </body>
 </html>
