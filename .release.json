@@ -1,0 +1,4 @@
+{
+  "app": "DiagnoseMyDisk",
+  "setup_glob": "DiagnoseMyDisk*Setup*.exe"
+}
