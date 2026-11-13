@@ -39,8 +39,8 @@ const I18N = {
     installedDisks: 'Disk Fisik Terdeteksi',
     modeLayman: 'Ringkasan',
     modeTech: 'Forensik S.M.A.R.T',
-    modeScanner: 'Pindai Sektor & Pemulihan',
-    modeStorage: 'Penyimpanan & Bersih',
+    modeScanner: 'Bad Sector & Perbaikan',
+    modeStorage: 'Penyimpanan & Pembersihan',
     storageTitle: 'Manajemen & Analisis Penyimpanan Disk',
     storageSubtitle: 'Pindai seluruh disk, temukan berkas duplikat, filter berkas besar/lawas, dan bersihkan cache sistem',
     refresh: 'Pindai Ulang',
@@ -49,7 +49,7 @@ const I18N = {
     maskingTitle: 'Peringatan: Anomali Firmware Ditemukan',
     maskingBadge: 'False 100% Terkunci',
     healthStatusHeader: 'Status Kesehatan',
-    trueHealthSub: 'True Health',
+    trueHealthSub: 'Kesehatan Sebenarnya',
     standardReaderReport: 'Alat standar membaca:',
     lockedStatus: '(Terkunci)',
     accurateStatus: '(Akurat)',
@@ -92,9 +92,9 @@ const I18N = {
     noLaymanFactors: 'Seluruh parameter operasional dalam batas normal. Tidak terdeteksi indikasi degradasi abnormal.',
     noTechPoints: 'Tidak ada catatan anomali register pada siklus pembacaan saat ini.',
     noSmartAttrs: 'Data atribut S.M.A.R.T belum terdeteksi. Driver controller memerlukan elevasi hak akses atau koneksi bus sedang sibuk. Silakan klik Pindai Ulang.',
-    statusGood: 'Good',
-    statusCaution: 'Caution',
-    statusBad: 'Bad',
+    statusGood: 'Baik',
+    statusCaution: 'Perhatian',
+    statusBad: 'Kritis',
     footerLicense: 'Open-Source',
     footerTagline: 'Diagnostik Hardware Presisi Bebas Manipulasi Firmware',
     disksDetected: '{0} Disk Fisik Terdeteksi',
@@ -243,6 +243,132 @@ const I18N = {
   }
 };
 
+// Static copy map for elements marked with data-i18n / data-i18n-html /
+// data-i18n-title / data-i18n-placeholder. Keeps every visible string in one
+// place so the two language modes cannot drift apart.
+const STATIC_I18N = {
+  navSummary: { en: 'Summary', id: 'Ringkasan' },
+  navSmart: { en: 'S.M.A.R.T forensic view', id: 'Tampilan forensik S.M.A.R.T' },
+  navScanner: { en: 'Bad sector scan and repair', id: 'Pindai dan perbaiki bad sector' },
+  navStorage: { en: 'Storage and cleanup', id: 'Penyimpanan dan pembersihan' },
+  navLogs: { en: 'Application diagnostic logs', id: 'Log diagnostik aplikasi' },
+  navExport: { en: 'Export diagnostic report as HTML', id: 'Ekspor laporan diagnostik sebagai HTML' },
+  apiCardLabel: { en: 'LOCAL API', id: 'API LOKAL' },
+  apiCardMeta: { en: 'Local only. Open reference.', id: 'Hanya lokal. Buka referensi.' },
+  waitingTelemetry: { en: 'Waiting for telemetry', id: 'Menunggu telemetri' },
+  nonAdminNotice: {
+    en: 'The app is running in <strong>Standard Mode (Non-Elevated)</strong>. Raw PhysicalDrive access and TRIM require Administrator rights.',
+    id: 'Aplikasi berjalan dalam <strong>Mode Standar (Non-Elevated)</strong>. Akses PhysicalDrive mentah dan TRIM memerlukan hak Administrator.',
+  },
+  relaunchAdmin: { en: 'Restart as Administrator', id: 'Mulai ulang sebagai Administrator' },
+  loading: { en: 'Loading...', id: 'Memuat...' },
+  waitingData: { en: 'Waiting for data', id: 'Menunggu data' },
+  powerYearsUnknown: { en: 'Power-on time unavailable', id: 'Jam terbang tidak tersedia' },
+  powerOnUnknown: { en: 'Power-on: -- hours', id: 'Power-on: -- jam' },
+  capacitySafe: { en: 'Free space is safe', id: 'Sisa ruang aman' },
+  writeAmplification: { en: 'Write amplification: N/A', id: 'Write amplification: N/A' },
+  resetMap: { en: 'Reset map', id: 'Reset peta' },
+  scanSpeed: { en: 'SPEED', id: 'KECEPATAN' },
+  scanLba: { en: 'LBA POSITION', id: 'LOKASI LBA' },
+  scanProgress: { en: 'PROGRESS', id: 'PROGRES' },
+  latencyExcellent: { en: '< 10ms (Excellent)', id: '< 10ms (Prima)' },
+  latencyGood: { en: '< 50ms (Good)', id: '< 50ms (Baik)' },
+  latencySlow: { en: '50-150ms (Slow)', id: '50-150ms (Lambat)' },
+  latencyWeak: { en: '150-500ms (Weak)', id: '150-500ms (Lemah)' },
+  latencyBad: { en: 'Bad sector (failed)', id: 'Bad sector (rusak)' },
+  repairExplainerTitle: { en: 'How bad-sector repair actually works', id: 'Bagaimana mekanisme perbaikan bad sector bekerja' },
+  repairExplainerBody: {
+    en: '• <strong>Mechanical HDD:</strong> A pending bad sector (SMART 0xC5) is resolved on the next write cycle. The drive firmware remaps the defective sector to a spare sector (SMART 0x05 Reallocated Sector).<br>• <strong>SSD (NVMe & SATA):</strong> Physically worn NAND cells cannot be repaired by software. Software can repair corrupt file-system clusters (MFT), verify partition integrity, and issue <strong>TRIM</strong> so the controller retires dead blocks and refreshes wear leveling.',
+    id: '• <strong>HDD mekanikal:</strong> Bad sector pending (SMART 0xC5) diperbaiki saat siklus penulisan berikutnya. Firmware drive merelokasi sektor cacat ke sektor cadangan (SMART 0x05 Reallocated Sector).<br>• <strong>SSD (NVMe & SATA):</strong> Sel NAND yang aus secara fisik tidak bisa diperbaiki software. Software dapat memperbaiki kluster sistem file yang rusak (MFT), memverifikasi integritas partisi, dan mengirim <strong>TRIM</strong> agar controller memensiunkan blok mati dan menyegarkan wear leveling.',
+  },
+  chkdskTitle: { en: 'File system repair (CHKDSK)', id: 'Perbaikan sistem file (CHKDSK)' },
+  chkdskDesc: { en: 'Scan and repair partition metadata, file indexes, and bad clusters online without a restart.', id: 'Pindai dan perbaiki metadata partisi, indeks file, dan kluster buruk secara online tanpa restart.' },
+  chkdskAction: { en: 'Run scan & fix', id: 'Jalankan scan & fix' },
+  trimTitle: { en: 'NAND cell TRIM optimization', id: 'Optimasi TRIM sel NAND' },
+  trimDesc: { en: 'Send ReTrim to the SSD controller to clear stale blocks and restore write performance.', id: 'Kirim ReTrim ke controller SSD untuk membersihkan blok sampah dan memulihkan performa tulis.' },
+  trimAction: { en: 'Send TRIM command', id: 'Kirim perintah TRIM' },
+  dirtyTitle: { en: 'Partition dirty-bit check', id: 'Verifikasi dirty bit partisi' },
+  dirtyDesc: { en: 'Check whether Windows flagged this volume as corrupt (dirty) after an unsafe shutdown.', id: 'Periksa apakah Windows menandai volume ini korup (dirty) akibat unsafe shutdown.' },
+  dirtyAction: { en: 'Check partition status', id: 'Cek status partisi' },
+  executionLog: { en: 'Hardware & system execution log', id: 'Log eksekusi hardware & sistem' },
+  clearLog: { en: 'Clear log', id: 'Bersihkan log' },
+  terminalIdle: { en: 'Waiting for a repair or scan command...', id: 'Menunggu instruksi pemulihan atau pemindaian...' },
+  chooseTarget: { en: 'Choose target drive', id: 'Pilih target disk' },
+  targetLabel: { en: 'Target:', id: 'Target:' },
+  allDrives: { en: 'All drives', id: 'Semua disk' },
+  scanDisk: { en: 'Scan disk', id: 'Pindai disk' },
+  scanningFiles: { en: 'Scanning files...', id: 'Memindai berkas...' },
+  liveLog: { en: 'Live log', id: 'Log live' },
+  cancel: { en: 'Cancel', id: 'Batal' },
+  allSizes: { en: 'All sizes', id: 'Semua ukuran' },
+  filesOnly: { en: 'Files only', id: 'Hanya berkas' },
+  foldersOnly: { en: 'Folders only', id: 'Hanya folder' },
+  largestFirst: { en: 'Largest → smallest', id: 'Terbesar → terkecil' },
+  smallestFirst: { en: 'Smallest → largest', id: 'Terkecil → terbesar' },
+  searchFiles: { en: 'Search file or folder name...', id: 'Cari nama berkas atau folder...' },
+  noResultsYet: { en: 'No scan results yet', id: 'Belum ada hasil pemindaian' },
+  thItemName: { en: 'ITEM NAME', id: 'NAMA ITEM' },
+  thType: { en: 'TYPE', id: 'TIPE' },
+  thSize: { en: 'SIZE', id: 'UKURAN' },
+  thModified: { en: 'LAST MODIFIED', id: 'TERAKHIR DIUBAH' },
+  thAction: { en: 'ACTION', id: 'AKSI' },
+  thOldName: { en: 'FILE / APP NAME', id: 'NAMA BERKAS / APLIKASI' },
+  thAge: { en: 'AGE', id: 'USIA' },
+  oneMonth: { en: '> 1 month', id: '> 1 bulan' },
+  threeMonths: { en: '> 3 months', id: '> 3 bulan' },
+  sixMonths: { en: '> 6 months', id: '> 6 bulan' },
+  oneYear: { en: '> 1 year', id: '> 1 tahun' },
+  noScanSession: { en: 'No scan has run in this session.', id: 'Belum ada pemindaian pada sesi ini.' },
+  cleanSelected: { en: 'Clean selected', id: 'Bersihkan terpilih' },
+  deleteSelectedCopies: { en: 'Delete selected copies', id: 'Hapus salinan terpilih' },
+  waitingTelemetryShort: { en: 'Source: waiting for telemetry', id: 'Sumber: menunggu telemetri' },
+  updatedDash: { en: 'Updated: --', id: 'Diperbarui: --' },
+  glossarySec1Title: { en: 'Flash cell hierarchy: SLC vs MLC vs TLC vs QLC', id: 'Hierarki sel flash: SLC vs MLC vs TLC vs QLC' },
+  glossaryCellType: { en: 'Cell type', id: 'Tipe sel' },
+  glossaryBits: { en: 'Bits / cell', id: 'Bit / sel' },
+  glossaryVoltage: { en: 'Voltage states', id: 'Status voltase' },
+  glossaryPE: { en: 'P/E endurance', id: 'Ketahanan P/E' },
+  glossaryTraits: { en: 'Characteristics & performance', id: 'Karakteristik & performa' },
+  glossarySec2Title: { en: 'What is the point of QLC?', id: 'Apa maksud dan tujuan fitur QLC?' },
+  glossarySec3Title: { en: 'DRAM cache vs DRAM-less (HMB)', id: 'DRAM cache vs DRAM-less (HMB)' },
+  glossaryTrimTitle: { en: 'Why TRIM matters', id: 'Pentingnya TRIM' },
+  glossarySmrTitle: { en: 'SMR vs CMR (hard disks)', id: 'SMR vs CMR (hard disk)' },
+  glossarySlcTrait: { en: 'Fastest, lowest latency, highest endurance. Most expensive. Used as cache.', id: 'Tercepat, latensi terendah, daya tahan tertinggi. Paling mahal. Dipakai sebagai cache.' },
+  glossaryMlcTrait: { en: 'Very fast and durable. Used in older Samsung Pro drives.', id: 'Sangat kencang dan awet. Dipakai di seri Samsung Pro lama.' },
+  glossaryTlcTrait: { en: '<strong>The modern standard</strong> (ADATA Legend 900, 980 Pro). Balanced price, capacity, and multi-year endurance.', id: '<strong>Standar emas modern</strong> (ADATA Legend 900, 980 Pro). Seimbang antara harga, kapasitas, dan ketahanan puluhan tahun.' },
+  glossaryQlcTrait: { en: 'About 33% denser and much cheaper. Relies on SLC cache for everyday speed.', id: 'Sekitar 33% lebih padat dan jauh lebih murah. Mengandalkan SLC cache untuk kecepatan harian.' },
+  glossarySec1Desc: { en: 'NAND flash stores electrons inside silicon transistors. The main difference between SLC, MLC, TLC, and QLC is <strong>how many data bits are packed into one physical cell</strong>:', id: 'Sel flash NAND menyimpan elektron di dalam transistor silikon. Perbedaan utama SLC, MLC, TLC, dan QLC adalah <strong>berapa banyak bit data yang dijejalkan ke dalam satu sel fisik</strong>:' },
+  glossaryQlcWhy: { en: '<strong>1. Why do manufacturers build QLC?</strong><br>Fitting 4 bits into one cell (16 micro voltage states) raises capacity by about 33% on the same silicon wafer. That makes very large SSDs (2TB, 4TB, even 8TB) far more affordable for regular users.', id: '<strong>1. Kenapa produsen membuat QLC?</strong><br>Dengan memuat 4 bit ke dalam satu sel (16 status voltase mikro), kapasitas naik sekitar 33% pada wafer silikon yang sama. Ini membuat SSD berkapasitas besar (2TB, 4TB, hingga 8TB) jauh lebih terjangkau.' },
+  glossaryQlcCache: { en: '<strong>2. Why does it need SLC cache?</strong><br>Because the controller must resolve 16 tightly spaced voltage levels, direct-to-die QLC writes are slow (~80-150 MB/s). To hide that, the controller programs part of the free capacity as <strong>SLC cache (fast 1-bit writes)</strong>. Everyday copies can hit 3,000-5,000 MB/s. Copy a very large file until the cache fills, and speed drops to native QLC speed.', id: '<strong>2. Kenapa butuh SLC cache?</strong><br>Karena controller harus membedakan 16 tingkat voltase yang sangat rapat, tulis QLC langsung ke die lambat (~80-150 MB/s). Untuk menyiasatinya, controller memprogram sebagian kapasitas kosong sebagai <strong>SLC cache (tulis 1-bit cepat)</strong>. Salin file harian bisa mencapai 3.000-5.000 MB/s. Salin file sangat besar sampai cache penuh, kecepatan turun ke kecepatan QLC asli.' },
+  glossaryQlcEndurance: { en: '<strong>3. Does QLC wear out quickly?</strong><br>Despite a ~300-1,000 P/E rating, a modern 2TB QLC SSD is usually rated for 400-800 TBW. For normal use and gaming (about 30-50 GB written per day), it can last well over 15-20 years before reaching its endurance limit.', id: '<strong>3. Apakah QLC cepat rusak?</strong><br>Meski rating P/E sekitar 300-1.000, SSD QLC 2TB modern biasanya memiliki rating 400-800 TBW. Untuk pemakaian normal dan gaming (sekitar 30-50 GB per hari), drive bisa bertahan lebih dari 15-20 tahun sebelum mencapai batas aus.' },
+  logsTitle: { en: 'Application diagnostic logs', id: 'Log diagnostik aplikasi' },
+  logsSubtitle: { en: 'Live runtime log for troubleshooting by you, support, or an AI assistant.', id: 'Log runtime langsung untuk troubleshooting oleh Anda, support, atau asisten AI.' },
+  copy: { en: 'Copy', id: 'Salin' },
+  openFile: { en: 'Open file', id: 'Buka file' },
+  clear: { en: 'Clear', id: 'Bersihkan' },
+  livePolling: { en: 'Live polling', id: 'Polling langsung' },
+  autoScroll: { en: 'Auto scroll', id: 'Auto scroll' },
+  apiTitle: { en: 'Local API reference', id: 'Referensi API lokal' },
+  apiSubtitle: { en: 'The desktop app exposes a read-only JSON API on the loopback interface only.', id: 'Aplikasi desktop menyediakan API JSON read-only hanya di antarmuka loopback.' },
+  apiBaseUrl: { en: 'Base URL', id: 'Base URL' },
+  apiAuth: { en: 'Auth header', id: 'Header autentikasi' },
+  apiScope: { en: 'Scope', id: 'Cakupan' },
+  apiScopeValue: { en: 'Localhost only', id: 'Hanya localhost' },
+  apiTokenLabel: { en: 'Session token', id: 'Token sesi' },
+  copyToken: { en: 'Copy token', id: 'Salin token' },
+  apiTokenNote: { en: 'The token changes every launch. Requests must come from 127.0.0.1 with the matching Host header. All data stays on this machine.', id: 'Token berubah setiap kali aplikasi dijalankan. Permintaan harus berasal dari 127.0.0.1 dengan Host header yang cocok. Semua data tetap di komputer ini.' },
+  apiEndpointsTitle: { en: 'Endpoints', id: 'Endpoint' },
+  apiExampleTitle: { en: 'Example request', id: 'Contoh permintaan' },
+  epDisks: { en: 'Full disk telemetry snapshot', id: 'Snapshot telemetri seluruh disk' },
+  epRefresh: { en: 'Rescan hardware and return fresh telemetry', id: 'Pindai ulang hardware dan kembalikan telemetri terbaru' },
+  epGlossary: { en: 'Flash technology glossary', id: 'Glosarium teknologi flash' },
+  epLogs: { en: 'Recent application log entries', id: 'Entri log aplikasi terbaru' },
+  epStorageResults: { en: 'Latest storage scan results', id: 'Hasil pemindaian penyimpanan terbaru' },
+  epDirty: { en: 'NTFS dirty-bit status for a volume', id: 'Status dirty bit NTFS untuk sebuah volume' },
+  epRefreshPost: { en: 'Trigger a rescan from automation', id: 'Picu pemindaian ulang dari otomasi' },
+  epPreferences: { en: 'Persist the UI language preference', id: 'Simpan preferensi bahasa antarmuka' },
+};
+
 // ---------------------------------------------------------------------------
 // Shared UI utilities
 // ---------------------------------------------------------------------------
@@ -269,6 +395,54 @@ function showToast(message, type = 'info', duration = 4200) {
   }, duration);
 }
 
+function getWindowsHealthMeta(disk) {
+  const status = disk && disk.windows_health ? disk.windows_health.status : null;
+  if (!status) return null;
+  const map = {
+    healthy: {
+      tone: 'good',
+      label: txt('Healthy', 'Sehat'),
+      short: txt('HEALTHY', 'SEHAT'),
+      className: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    },
+    warning: {
+      tone: 'caution',
+      label: txt('Needs attention', 'Perlu perhatian'),
+      short: txt('ATTENTION', 'PERHATIAN'),
+      className: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    },
+    unhealthy: {
+      tone: 'bad',
+      label: txt('Unhealthy', 'Tidak sehat'),
+      short: txt('UNHEALTHY', 'TIDAK SEHAT'),
+      className: 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300',
+    },
+  };
+  return map[status] || null;
+}
+
+function telemetryReasonText(disk) {
+  switch (disk && disk.telemetry_reason) {
+    case 'not-elevated':
+      return txt(
+        'Windows blocks raw S.M.A.R.T access for standard apps. Restart as Administrator to read wear and temperature.',
+        'Windows memblokir akses S.M.A.R.T mentah untuk aplikasi standar. Mulai ulang sebagai Administrator untuk membaca wear dan suhu.'
+      );
+    case 'nvme-smart-not-exposed':
+      return txt(
+        'The NVMe driver does not expose raw S.M.A.R.T registers to apps. Windows still reports the device health below.',
+        'Driver NVMe tidak mengekspos register S.M.A.R.T mentah ke aplikasi. Windows tetap melaporkan status perangkat di bawah ini.'
+      );
+    case 'smart-not-exposed':
+      return txt(
+        'This controller does not expose raw S.M.A.R.T registers to apps. Windows still reports the device health below.',
+        'Controller ini tidak mengekspos register S.M.A.R.T mentah ke aplikasi. Windows tetap melaporkan status perangkat di bawah ini.'
+      );
+    default:
+      return '';
+  }
+}
+
 function getDataSourceMeta(disk) {
   const source = disk.data_source || 'unavailable';
   if (source === 'live-wmi') {
@@ -288,10 +462,22 @@ function getDataSourceMeta(disk) {
       className: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
     };
   }
+  if (source === 'windows-health') {
+    return {
+      key: source,
+      label: currentLang === 'en' ? 'WINDOWS HEALTH' : 'STATUS WINDOWS',
+      detail: txt(
+        'Device health reported by Windows; raw S.M.A.R.T is not exposed by the driver.',
+        'Status kesehatan perangkat dari Windows; S.M.A.R.T mentah tidak diekspos driver.'
+      ),
+      className: 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+    };
+  }
+  const reason = telemetryReasonText(disk);
   return {
     key: source,
     label: currentLang === 'en' ? 'UNAVAILABLE' : 'TIDAK TERSEDIA',
-    detail: currentLang === 'en' ? 'Telemetry could not be read. Run as Administrator.' : 'Telemetri tidak dapat dibaca. Jalankan sebagai Administrator.',
+    detail: reason || (currentLang === 'en' ? 'Telemetry could not be read.' : 'Telemetri tidak dapat dibaca.'),
     className: 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300',
   };
 }
@@ -302,6 +488,64 @@ function jsPathArg(path) {
 
 function txt(en, id) {
   return currentLang === 'en' ? en : id;
+}
+
+function staticText(key) {
+  const entry = STATIC_I18N[key];
+  if (!entry) return null;
+  return entry[currentLang] !== undefined ? entry[currentLang] : entry.en;
+}
+
+function applyStaticI18n(root = document) {
+  root.querySelectorAll('[data-i18n]').forEach((el) => {
+    const value = staticText(el.getAttribute('data-i18n'));
+    if (value !== null) el.textContent = value;
+  });
+  root.querySelectorAll('[data-i18n-html]').forEach((el) => {
+    const value = staticText(el.getAttribute('data-i18n-html'));
+    if (value !== null) el.innerHTML = value;
+  });
+  root.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    const value = staticText(el.getAttribute('data-i18n-title'));
+    if (value !== null) el.setAttribute('title', value);
+  });
+  root.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    const value = staticText(el.getAttribute('data-i18n-placeholder'));
+    if (value !== null) el.setAttribute('placeholder', value);
+  });
+}
+
+function syncApiDocs() {
+  const origin = window.location.origin;
+  const tokenInput = document.getElementById('api-token-value');
+  if (tokenInput) tokenInput.value = APP_TOKEN;
+  const baseUrl = document.getElementById('api-base-url');
+  if (baseUrl) baseUrl.textContent = origin;
+  const sidebarBase = document.getElementById('api-base-url-sidebar');
+  if (sidebarBase) sidebarBase.textContent = origin.replace('http://', '');
+  const example = document.getElementById('api-example');
+  if (example) {
+    example.textContent = `curl -s ${origin}/api/disks -H "X-App-Token: ${APP_TOKEN}"`;
+  }
+}
+
+async function copyApiToken() {
+  try {
+    await navigator.clipboard.writeText(APP_TOKEN);
+    showToast(txt('API token copied.', 'Token API disalin.'), 'success');
+  } catch (err) {
+    showToast(txt('Could not copy the token.', 'Gagal menyalin token.'), 'error');
+  }
+}
+
+async function copyApiExample() {
+  const example = document.getElementById('api-example');
+  try {
+    await navigator.clipboard.writeText(example ? example.textContent : '');
+    showToast(txt('Example copied.', 'Contoh perintah disalin.'), 'success');
+  } catch (err) {
+    showToast(txt('Could not copy the example.', 'Gagal menyalin contoh.'), 'error');
+  }
 }
 
 function formatNumberOrDash(value, suffix = '') {
@@ -395,24 +639,32 @@ function setLanguage(lang, triggerRender = true) {
       : 'Bukti dulu. Tidak mengarang telemetri.';
   }
   document.getElementById('txt-installed-disks').textContent = t.installedDisks;
+  const diskCountBadge = document.getElementById('disk-count-badge');
+  if (diskCountBadge) {
+    diskCountBadge.textContent = allDisks.length > 0
+      ? t.disksDetected.replace('{0}', allDisks.length)
+      : (currentLang === 'en' ? 'Loading...' : 'Memuat...');
+  }
   document.getElementById('txt-mode-layman').textContent = t.modeLayman;
   document.getElementById('txt-mode-tech').textContent = t.modeTech;
   document.getElementById('txt-mode-scanner').textContent = t.modeScanner;
   const txtModeStorage = document.getElementById('txt-mode-storage');
   if (txtModeStorage) txtModeStorage.textContent = t.modeStorage || 'Penyimpanan & Bersih';
+  const txtModeLogs = document.getElementById('txt-mode-logs');
+  if (txtModeLogs) txtModeLogs.textContent = currentLang === 'en' ? 'Logs' : 'Log';
   const txtStorageTitle = document.getElementById('txt-storage-title');
   if (txtStorageTitle && t.storageTitle) txtStorageTitle.textContent = t.storageTitle;
   const txtStorageSubtitle = document.getElementById('txt-storage-subtitle');
   if (txtStorageSubtitle && t.storageSubtitle) txtStorageSubtitle.textContent = t.storageSubtitle;
   document.getElementById('txt-refresh').textContent = t.refresh;
   const exportLabel = document.getElementById('txt-export-report');
-  if (exportLabel) exportLabel.textContent = currentLang === 'en' ? 'Export' : 'Ekspor';
-  const logsLabel = document.getElementById('txt-btn-logs');
-  if (logsLabel) logsLabel.textContent = currentLang === 'en' ? 'Logs' : 'Log';
+  if (exportLabel) exportLabel.textContent = currentLang === 'en' ? 'Export report' : 'Ekspor laporan';
   const topbarEyebrow = document.getElementById('topbar-eyebrow');
   if (topbarEyebrow) topbarEyebrow.textContent = currentLang === 'en' ? 'Active drive' : 'Drive aktif';
   const sideWorkspace = document.getElementById('lbl-sidebar-workspace');
-  if (sideWorkspace) sideWorkspace.textContent = currentLang === 'en' ? 'Workspace' : 'Ruang kerja';
+  if (sideWorkspace) sideWorkspace.textContent = currentLang === 'en' ? 'Diagnose' : 'Diagnosa';
+  const sideMaintain = document.getElementById('lbl-sidebar-maintain');
+  if (sideMaintain) sideMaintain.textContent = currentLang === 'en' ? 'Maintain' : 'Perawatan';
   const sideTools = document.getElementById('lbl-sidebar-tools');
   if (sideTools) sideTools.textContent = currentLang === 'en' ? 'Tools' : 'Alat';
   const sidePreferences = document.getElementById('lbl-sidebar-preferences');
@@ -421,7 +673,7 @@ function setLanguage(lang, triggerRender = true) {
   const storageLabels = {
     'txt-btn-storage-scan': ['Scan Disk', 'Pindai Disk'],
     'lbl-rec-cleanable': ['RECLAIMABLE', 'POTENSI HEMAT'],
-    'txt-rec-banner-title': ['Safe cleanup recommendations', 'Pembersihan aman rekomendasi'],
+    'txt-rec-banner-title': ['Safe cleanup recommendations', 'Rekomendasi pembersihan aman'],
     'txt-rec-banner-sub': ['Remove installer caches, crash dumps, and temporary files without touching personal data.', 'Hapus cache installer, crash dump, dan file temporary tanpa mengganggu data pribadi.'],
     'txt-sub-recommend': ['Cleanup recommendations', 'Rekomendasi pembersihan'],
     'txt-sub-large': ['Large files & folders', 'Berkas & folder besar'],
@@ -519,12 +771,30 @@ function setLanguage(lang, triggerRender = true) {
     scanBtnText.textContent = isScanning ? t.scanPause : (currentScanBlock > 0 && currentScanBlock < TOTAL_SCAN_BLOCKS ? t.scanResume : t.scanStart);
   }
 
+  document.documentElement.lang = currentLang;
+  document.title = currentLang === 'en'
+    ? 'DiagnoseMyDisk — Disk health, bad sectors & S.M.A.R.T telemetry'
+    : 'DiagnoseMyDisk — Kesehatan disk, bad sector & telemetri S.M.A.R.T';
+  applyStaticI18n();
+  syncApiDocs();
+
   if (triggerRender && allDisks.length > 0) {
     renderDriveTabs();
     renderActiveDisk();
   }
-  if (triggerRender && storageResults) {
-    renderStorageResults(storageResults);
+  if (triggerRender) {
+    updateDriveUsageHero();
+    if (typeof renderStorageDriveDropdown === 'function' && document.getElementById('storage-drive-select')) {
+      renderStorageDriveDropdown();
+    }
+    if (storageResults) {
+      renderStorageResults(storageResults);
+    } else {
+      renderRecommendationsSubTab();
+    }
+  }
+  if (triggerRender && currentMode === 'logs') {
+    fetchAppLogs();
   }
 }
 
@@ -586,16 +856,22 @@ function setMode(mode) {
   const btnTech = document.getElementById('btn-mode-tech');
   const btnScanner = document.getElementById('btn-mode-scanner');
   const btnStorage = document.getElementById('btn-mode-storage');
+  const btnLogs = document.getElementById('btn-mode-logs');
+  const btnApi = document.getElementById('btn-open-api');
   const viewLayman = document.getElementById('view-layman');
   const viewTech = document.getElementById('view-tech');
   const viewScanner = document.getElementById('view-scanner');
   const viewStorage = document.getElementById('view-storage');
+  const viewLogs = document.getElementById('view-logs');
+  const viewApi = document.getElementById('view-api');
 
   const navItems = {
     layman: btnLayman,
     tech: btnTech,
     scanner: btnScanner,
     storage: btnStorage,
+    logs: btnLogs,
+    api: btnApi,
   };
   Object.entries(navItems).forEach(([key, button]) => {
     if (!button) return;
@@ -612,26 +888,39 @@ function setMode(mode) {
   if (viewTech) viewTech.classList.toggle('hidden', mode !== 'tech');
   if (viewScanner) viewScanner.classList.toggle('hidden', mode !== 'scanner');
   if (viewStorage) viewStorage.classList.toggle('hidden', mode !== 'storage');
+  if (viewLogs) viewLogs.classList.toggle('hidden', mode !== 'logs');
+  if (viewApi) viewApi.classList.toggle('hidden', mode !== 'api');
 
   // Each mode owns its workspace. The large hero is reserved for Summary.
   const isSummary = mode === 'layman';
-  const isStorage = mode === 'storage';
+  const isDataView = mode === 'layman' || mode === 'tech' || mode === 'scanner';
   const heroSection = document.getElementById('disk-hero-section');
   if (heroSection) heroSection.classList.toggle('hidden', !isSummary);
   const driveSelector = document.getElementById('drive-selector-section');
-  if (driveSelector) driveSelector.classList.toggle('hidden', isStorage);
+  if (driveSelector) driveSelector.classList.toggle('hidden', !isDataView);
   const gapBanner = document.getElementById('telemetry-gap-banner');
   if (gapBanner) gapBanner.classList.toggle('hidden', !isSummary);
   const maskingBanner = document.getElementById('masking-banner');
   if (maskingBanner && !isSummary) maskingBanner.classList.add('hidden');
 
-  if (allDisks.length > 0) {
+  if (isDataView && allDisks.length > 0) {
     renderActiveDisk();
   }
 
   if (mode === 'storage') {
     initStorageView();
   }
+  if (mode === 'logs') {
+    startLogsPolling();
+  } else {
+    stopLogsPolling();
+  }
+  if (mode === 'api') {
+    syncApiDocs();
+  }
+
+  const main = document.querySelector('main');
+  if (main) main.scrollTop = 0;
 
   safeCreateIcons();
 }
@@ -642,12 +931,12 @@ async function relaunchAsAdmin() {
     const resp = await apiFetch('/api/relaunch_admin', { method: 'POST' });
     const data = await resp.json();
     if (data.success) {
-      showToast(currentLang === 'en' ? 'Restarting application with Administrator privileges...' : 'Memulai ulang aplikasi dengan hak Administrator...', 'info');
+      showToast(txt('Restarting with Administrator privileges...', 'Memulai ulang dengan hak Administrator...'), 'info');
     } else {
-      showToast(data.error || 'Gagal memulai ulang aplikasi.', 'error');
+      showToast(data.error || txt('Failed to restart the app.', 'Gagal memulai ulang aplikasi.'), 'error');
     }
   } catch (err) {
-    showToast(`Gagal memulai ulang: ${err.message}`, 'error');
+    showToast(txt(`Restart failed: ${err.message}`, `Gagal memulai ulang: ${err.message}`), 'error');
   }
 }
 
@@ -734,6 +1023,7 @@ function renderDriveTabs() {
     const trueHealth = healthValue(ha);
     const isMasking = ha.is_masking || false;
     const source = getDataSourceMeta(disk);
+    const winMeta = getWindowsHealthMeta(disk);
 
     let badgeClass = 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200';
     if (trueHealth !== null) {
@@ -744,6 +1034,8 @@ function renderDriveTabs() {
       } else {
         badgeClass = 'health-badge-good';
       }
+    } else if (winMeta) {
+      badgeClass = winMeta.tone === 'bad' ? 'health-badge-bad' : (winMeta.tone === 'caution' ? 'health-badge-caution' : 'health-badge-good');
     }
 
     const driveLetters = disk.drive_letters_str || '-';
@@ -770,9 +1062,9 @@ function renderDriveTabs() {
           
           <div class="shrink-0 flex flex-col items-end">
             <span class="${badgeClass} px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-tight">
-              ${trueHealth === null ? 'N/A' : `${trueHealth}%`}
+              ${trueHealth === null ? (winMeta ? winMeta.short : 'N/A') : `${trueHealth}%`}
             </span>
-            ${isMasking ? '<span class="text-[9px] text-rose-600 font-bold tracking-tighter">MASKED</span>' : ''}
+            ${isMasking ? `<span class="text-[9px] text-rose-600 font-bold tracking-tighter">${txt('MASKED', 'TERKUNCI')}</span>` : ''}
           </div>
         </div>
       </div>
@@ -802,6 +1094,8 @@ function renderActiveDisk() {
   const isMasking = ha.is_masking || false;
   const source = getDataSourceMeta(disk);
   const gaps = Array.isArray(disk.data_gaps) ? disk.data_gaps : [];
+  const winMeta = getWindowsHealthMeta(disk);
+  const reasonText = telemetryReasonText(disk);
 
   const topName = document.getElementById('topbar-disk-name');
   const topMeta = document.getElementById('topbar-disk-meta');
@@ -810,18 +1104,24 @@ function renderActiveDisk() {
   const topUpdated = document.getElementById('topbar-updated');
   if (topName) topName.textContent = disk.name;
   if (topMeta) {
-    const size = disk.size_gb ? `${disk.size_gb} GB` : 'size N/A';
+    const size = disk.size_gb ? `${disk.size_gb} GB` : txt('size N/A', 'ukuran N/A');
     topMeta.textContent = `${size} · ${disk.media_type || 'N/A'} / ${disk.bus_type || 'N/A'} · ${disk.drive_letters_str || '-'}`;
   }
   if (topChip) {
-    topChip.textContent = trueHealth === null
-      ? (currentLang === 'en' ? 'HEALTH N/A' : 'KESEHATAN N/A')
-      : `${trueHealth}% ${currentLang === 'en' ? 'TRUE HEALTH' : 'KESEHATAN'}`;
-    topChip.className = 'topbar-chip';
-    if (trueHealth === null) topChip.classList.add('is-unknown');
-    else if (trueHealth < 60) topChip.classList.add('is-bad');
-    else if (trueHealth < 90 || isMasking) topChip.classList.add('is-warn');
-    else topChip.classList.add('is-good');
+    if (trueHealth === null && winMeta) {
+      topChip.textContent = winMeta.short;
+      topChip.className = 'topbar-chip';
+      topChip.classList.add(winMeta.tone === 'bad' ? 'is-bad' : (winMeta.tone === 'caution' ? 'is-warn' : 'is-good'));
+    } else {
+      topChip.textContent = trueHealth === null
+        ? (currentLang === 'en' ? 'HEALTH N/A' : 'KESEHATAN N/A')
+        : `${trueHealth}% ${currentLang === 'en' ? 'TRUE HEALTH' : 'KESEHATAN'}`;
+      topChip.className = 'topbar-chip';
+      if (trueHealth === null) topChip.classList.add('is-unknown');
+      else if (trueHealth < 60) topChip.classList.add('is-bad');
+      else if (trueHealth < 90 || isMasking) topChip.classList.add('is-warn');
+      else topChip.classList.add('is-good');
+    }
   }
   if (topSource) {
     topSource.textContent = source.label;
@@ -843,12 +1143,16 @@ function renderActiveDisk() {
   if (gapBanner && gapText) {
     if ((source.key === 'unavailable' || gaps.length > 0) && currentMode === 'layman') {
       gapBanner.classList.remove('hidden');
-      gapText.textContent = gaps.length > 0
-        ? `${source.detail} · Data tidak tersedia: ${gaps.join(', ')}`
-        : source.detail;
+      let detail = reasonText || source.detail;
+      if (gaps.length > 0 && !winMeta) {
+        detail += ` · ${txt('Unavailable', 'Tidak tersedia')}: ${gaps.join(', ')}`;
+      }
+      gapText.textContent = detail;
       if (gapBadge) {
         gapBadge.textContent = source.label;
-        gapBadge.className = `font-mono font-bold px-2 py-0.5 rounded border border-amber-400/40 bg-amber-500/10 shrink-0`;
+        gapBadge.className = winMeta
+          ? 'font-mono font-bold px-2 py-0.5 rounded border border-blue-400/40 bg-blue-500/10 shrink-0'
+          : 'font-mono font-bold px-2 py-0.5 rounded border border-amber-400/40 bg-amber-500/10 shrink-0';
       }
     } else {
       gapBanner.classList.add('hidden');
@@ -871,14 +1175,24 @@ function renderActiveDisk() {
   const badgeHealth = document.getElementById('cdi-health-badge');
   const badgeLabel = document.getElementById('badge-label');
   const badgePct = document.getElementById('badge-percentage');
+  const badgeSub = document.getElementById('badge-sub');
   const cdiClaimVal = document.getElementById('cdi-claim-val');
   const badgeCdiCompare = document.getElementById('badge-cdi-compare');
 
-  if (badgePct) badgePct.textContent = trueHealth === null ? 'N/A' : `${trueHealth}%`;
+  if (badgePct) badgePct.textContent = trueHealth === null ? (winMeta ? '—' : 'N/A') : `${trueHealth}%`;
+  if (badgeSub) {
+    badgeSub.textContent = trueHealth === null && winMeta
+      ? txt('Device status', 'Status perangkat')
+      : t.trueHealthSub;
+  }
 
   if (badgeCdiCompare) {
     if (reportedHealth === null) {
-      badgeCdiCompare.innerHTML = `<span class="text-zinc-500 dark:text-zinc-400">${currentLang === 'en' ? 'No comparative health source' : 'Tidak ada sumber pembanding'}</span>`;
+      if (winMeta) {
+        badgeCdiCompare.innerHTML = `${txt('Windows reports', 'Windows melaporkan')} <span class="font-bold text-zinc-900 dark:text-zinc-100">${winMeta.label}</span>. ${reasonText ? `<span class="block mt-1">${escapeHtml(reasonText)}</span>` : ''}`;
+      } else {
+        badgeCdiCompare.innerHTML = `<span class="text-zinc-500 dark:text-zinc-400">${reasonText ? escapeHtml(reasonText) : txt('No comparative health source', 'Tidak ada sumber pembanding')}</span>`;
+      }
     } else if (isMasking) {
       badgeCdiCompare.innerHTML = `${t.standardReaderReport} <span id="cdi-claim-val" class="text-zinc-900 dark:text-zinc-100 font-mono font-bold">${reportedHealth}%</span> <span class="text-rose-600 font-bold">${t.lockedStatus}</span>`;
     } else {
@@ -888,11 +1202,16 @@ function renderActiveDisk() {
     cdiClaimVal.textContent = reportedHealth === null ? 'N/A' : `${reportedHealth}%`;
   }
 
-  const orbitTone = trueHealth === null ? 'unknown' : (trueHealth < 60 ? 'bad' : (trueHealth < 90 || isMasking ? 'caution' : 'good'));
+  const orbitTone = trueHealth === null
+    ? (winMeta ? winMeta.tone : 'unknown')
+    : (trueHealth < 60 ? 'bad' : (trueHealth < 90 || isMasking ? 'caution' : 'good'));
+  const orbitPct = trueHealth !== null
+    ? trueHealth
+    : (winMeta ? (winMeta.tone === 'good' ? 100 : (winMeta.tone === 'caution' ? 55 : 18)) : 0);
   badgeHealth.className = `health-orbit health-orbit--${orbitTone} select-none`;
-  badgeHealth.style.setProperty('--health', `${trueHealth === null ? 0 : trueHealth}%`);
+  badgeHealth.style.setProperty('--health', `${orbitPct}%`);
   if (trueHealth === null) {
-    badgeLabel.textContent = currentLang === 'en' ? 'Unknown' : 'Tidak Diketahui';
+    badgeLabel.textContent = winMeta ? winMeta.label : (currentLang === 'en' ? 'Unknown' : 'Tidak Diketahui');
   } else if (trueHealth < 60) {
     badgeLabel.textContent = t.statusBad;
   } else if (trueHealth < 90 || isMasking) {
@@ -1331,18 +1650,18 @@ function showSurfaceTooltip(e, blockIndex) {
   const b = scanBlocksData[blockIndex];
   if (!b) return;
 
-  let statusText = 'Belum Dipindai';
-  if (b.status === 'excellent') statusText = 'Prima (<10ms)';
-  else if (b.status === 'good') statusText = 'Baik (<50ms)';
-  else if (b.status === 'slow') statusText = 'Cukup Lambat (50-150ms)';
-  else if (b.status === 'weak') statusText = 'Sangat Lambat (150-500ms)';
-  else if (b.status === 'bad') statusText = `Bad Sector / Error: ${b.error || '>500ms'}`;
+  let statusText = txt('Not scanned', 'Belum dipindai');
+  if (b.status === 'excellent') statusText = txt('Excellent (<10ms)', 'Prima (<10ms)');
+  else if (b.status === 'good') statusText = txt('Good (<50ms)', 'Baik (<50ms)');
+  else if (b.status === 'slow') statusText = txt('Slow (50-150ms)', 'Cukup lambat (50-150ms)');
+  else if (b.status === 'weak') statusText = txt('Very slow (150-500ms)', 'Sangat lambat (150-500ms)');
+  else if (b.status === 'bad') statusText = txt(`Bad sector / error: ${b.error || '>500ms'}`, `Bad sector / error: ${b.error || '>500ms'}`);
 
   tooltip.innerHTML = `
-    <div class="font-bold text-zinc-200">Blok #${blockIndex + 1} / ${TOTAL_SCAN_BLOCKS}</div>
+    <div class="font-bold text-zinc-200">${txt('Block', 'Blok')} #${blockIndex + 1} / ${TOTAL_SCAN_BLOCKS}</div>
     <div class="text-[10px] text-zinc-400">Offset: ~${b.offset_gb} GB</div>
-    <div class="text-[10px] text-zinc-300">Latensi: <span class="font-bold text-blue-400">${b.latency_ms} ms</span></div>
-    <div class="text-[10px] text-zinc-300">Kecepatan: <span class="font-bold text-emerald-400">${b.speed_mb_s} MB/s</span></div>
+    <div class="text-[10px] text-zinc-300">${txt('Latency', 'Latensi')}: <span class="font-bold text-blue-400">${b.latency_ms} ms</span></div>
+    <div class="text-[10px] text-zinc-300">${txt('Speed', 'Kecepatan')}: <span class="font-bold text-emerald-400">${b.speed_mb_s} MB/s</span></div>
     <div class="text-[10px] text-zinc-400 mt-0.5">Status: <span class="font-bold text-zinc-100">${statusText}</span></div>
   `;
   tooltip.classList.remove('hidden');
@@ -1399,7 +1718,7 @@ function toggleScanProcess() {
     if (btn) btn.textContent = t.scanPause;
     if (icon) icon.setAttribute('data-lucide', 'pause');
     safeCreateIcons();
-    appendTerminalLog(`[START] Memulai pemindaian permukaan sektor pada PhysicalDrive...`);
+    appendTerminalLog(txt(`[START] Starting surface scan on PhysicalDrive...`, `[START] Memulai pemindaian permukaan sektor pada PhysicalDrive...`));
     executeScanStep();
   }
 }
@@ -1415,7 +1734,7 @@ async function executeScanStep() {
     if (btn) btn.textContent = t.scanStart;
     if (icon) icon.setAttribute('data-lucide', 'play');
     safeCreateIcons();
-    appendTerminalLog(`[SELESAI] Pemindaian selesai: ${scanStats.bad} bad sectors terdeteksi, ${scanStats.weak} blok lemah.`);
+    appendTerminalLog(txt(`[DONE] Scan complete: ${scanStats.bad} bad sectors, ${scanStats.weak} weak blocks.`, `[SELESAI] Pemindaian selesai: ${scanStats.bad} bad sector, ${scanStats.weak} blok lemah.`));
     return;
   }
 
@@ -1485,7 +1804,7 @@ async function executeScanStep() {
     }
   } catch (err) {
     console.error('Scan step error:', err);
-    appendTerminalLog(`[ERROR] Gagal memindai blok ${currentScanBlock}: ${err.message}`);
+    appendTerminalLog(txt(`[ERROR] Failed to scan block ${currentScanBlock}: ${err.message}`, `[ERROR] Gagal memindai blok ${currentScanBlock}: ${err.message}`));
     currentScanBlock += chunkSize;
   }
 
@@ -1513,7 +1832,7 @@ function appendTerminalLog(msg) {
 function clearTerminalLog() {
   const terminal = document.getElementById('repair-terminal');
   if (terminal) {
-    terminal.textContent = 'Log dibersihkan. Menunggu instruksi pemulihan atau pemindaian...';
+    terminal.textContent = txt('Log cleared. Waiting for a repair or scan command...', 'Log dibersihkan. Menunggu instruksi pemulihan atau pemindaian...');
   }
 }
 
@@ -1524,7 +1843,7 @@ async function runChkdskAction() {
   const btn = document.getElementById('btn-action-chkdsk');
 
   if (btn) btn.disabled = true;
-  appendTerminalLog(`[CHKDSK] Menjalankan pemeriksaan struktur cluster & sistem file pada Drive ${drive}: ...`);
+  appendTerminalLog(txt(`[CHKDSK] Checking file-system and cluster structure on drive ${drive}: ...`, `[CHKDSK] Memeriksa struktur cluster dan sistem file pada drive ${drive}: ...`));
 
   try {
     const resp = await apiFetch('/api/repair_chkdsk', {
@@ -1534,9 +1853,9 @@ async function runChkdskAction() {
     });
     const data = await resp.json();
     if (data.success) {
-      appendTerminalLog(`[CHKDSK SUKSES]\n${data.output}`);
+      appendTerminalLog(txt(`[CHKDSK OK]\n${data.output}`, `[CHKDSK SUKSES]\n${data.output}`));
     } else {
-      appendTerminalLog(`[CHKDSK GAGAL] ${data.error || data.message}`);
+      appendTerminalLog(txt(`[CHKDSK FAILED] ${data.error || data.message}`, `[CHKDSK GAGAL] ${data.error || data.message}`));
     }
   } catch (err) {
     appendTerminalLog(`[CHKDSK ERROR] ${err.message}`);
@@ -1552,7 +1871,7 @@ async function runTrimAction() {
   const btn = document.getElementById('btn-action-trim');
 
   if (btn) btn.disabled = true;
-  appendTerminalLog(`[TRIM] Mengirim instruksi deallokasi sel flash (ReTrim) ke controller disk ${drive}: ...`);
+  appendTerminalLog(txt(`[TRIM] Sending flash-cell deallocation (ReTrim) to drive ${drive}: ...`, `[TRIM] Mengirim deallokasi sel flash (ReTrim) ke drive ${drive}: ...`));
 
   try {
     const resp = await apiFetch('/api/repair_trim', {
@@ -1562,9 +1881,9 @@ async function runTrimAction() {
     });
     const data = await resp.json();
     if (data.success) {
-      appendTerminalLog(`[TRIM SUKSES]\n${data.output}`);
+      appendTerminalLog(txt(`[TRIM OK]\n${data.output}`, `[TRIM SUKSES]\n${data.output}`));
     } else {
-      appendTerminalLog(`[TRIM GAGAL] ${data.error || data.message}`);
+      appendTerminalLog(txt(`[TRIM FAILED] ${data.error || data.message}`, `[TRIM GAGAL] ${data.error || data.message}`));
     }
   } catch (err) {
     appendTerminalLog(`[TRIM ERROR] ${err.message}`);
@@ -1580,7 +1899,7 @@ async function runDirtyCheckAction() {
   const btn = document.getElementById('btn-action-dirty');
 
   if (btn) btn.disabled = true;
-  appendTerminalLog(`[DIRTY BIT] Memeriksa status integritas volume ${drive}: ...`);
+  appendTerminalLog(txt(`[DIRTY BIT] Checking volume integrity on drive ${drive}: ...`, `[DIRTY BIT] Memeriksa integritas volume ${drive}: ...`));
 
   try {
     const resp = await apiFetch(`/api/dirty_check?drive=${drive}`);
@@ -1589,7 +1908,7 @@ async function runDirtyCheckAction() {
       const statusDirty = data.is_dirty ? 'PERINGATAN: Partisi kotor (Dirty Bit aktif)! Diperlukan chkdsk /f.' : 'STATUS BERSIH: Partisi sehat dan tersinkronisasi sempurna.';
       appendTerminalLog(`[HASIL DIRTY BIT] ${statusDirty}\n${data.output}`);
     } else {
-      appendTerminalLog(`[DIRTY BIT GAGAL] ${data.error}`);
+      appendTerminalLog(txt(`[DIRTY BIT FAILED] ${data.error}`, `[DIRTY BIT GAGAL] ${data.error}`));
     }
   } catch (err) {
     appendTerminalLog(`[DIRTY BIT ERROR] ${err.message}`);
@@ -1930,7 +2249,7 @@ async function triggerStorageScan() {
   const btnScan = document.getElementById('btn-storage-scan');
   const txtScan = document.getElementById('txt-btn-storage-scan');
   if (btnScan) btnScan.disabled = true;
-  if (txtScan) txtScan.textContent = 'Menyiapkan Pindai...';
+  if (txtScan) txtScan.textContent = txt('Preparing scan...', 'Menyiapkan pindai...');
 
   try {
     const res = await apiFetch('/api/storage/start_scan', {
@@ -1943,10 +2262,10 @@ async function triggerStorageScan() {
       showStorageProgress(true);
       startStoragePolling();
     } else {
-      showToast(`Gagal memulai pemindaian: ${data.message || data.error}`, 'error');
+      showToast(txt(`Could not start the scan: ${data.message || data.error}`, `Gagal memulai pemindaian: ${data.message || data.error}`), 'error');
     }
   } catch (err) {
-    showToast(`Terjadi kesalahan jaringan: ${err.message}`, 'error');
+    showToast(txt(`Network error: ${err.message}`, `Kesalahan jaringan: ${err.message}`), 'error');
   } finally {
     if (btnScan) btnScan.disabled = false;
   }
@@ -1977,7 +2296,7 @@ function startStoragePolling() {
     btnScan.classList.replace('bg-blue-600', 'bg-zinc-600');
     btnScan.classList.replace('hover:bg-blue-700', 'hover:bg-zinc-700');
   }
-  if (txtScan) txtScan.textContent = 'Memindai...';
+  if (txtScan) txtScan.textContent = txt('Scanning...', 'Memindai...');
   if (iconScan) iconScan.setAttribute('data-lucide', 'loader-2');
   safeCreateIcons();
 
@@ -1997,7 +2316,7 @@ function startStoragePolling() {
           btnScan.classList.replace('bg-zinc-600', 'bg-blue-600');
           btnScan.classList.replace('hover:bg-zinc-700', 'hover:bg-blue-700');
         }
-        if (txtScan) txtScan.textContent = 'Mulai Pindai Disk';
+        if (txtScan) txtScan.textContent = txt('Scan disk', 'Mulai pindai disk');
         if (iconScan) iconScan.setAttribute('data-lucide', 'play');
         safeCreateIcons();
 
@@ -2012,6 +2331,34 @@ function startStoragePolling() {
   }, 400);
 }
 
+function storageStatusText(st) {
+  const args = (st && st.status_args) || {};
+  switch (st && st.status_code) {
+    case 'cancelling':
+      return txt('Cancelling scan...', 'Membatalkan pemindaian...');
+    case 'preparing':
+      return txt('Preparing scan...', 'Menyiapkan pemindaian...');
+    case 'checking_cache':
+      return txt('Checking system caches and leftover installers...', 'Memeriksa cache sistem & sisa instalasi...');
+    case 'scanning_drive':
+      return txt(`Scanning drive ${args.drive || ''}...`, `Memindai drive ${args.drive || ''}...`);
+    case 'analyzing_duplicates':
+      return txt('Analyzing duplicate files...', 'Menganalisis berkas duplikat...');
+    case 'analyzing_duplicates_progress':
+      return txt(`Analyzing duplicate files (${args.current}/${args.total})...`, `Menganalisis berkas duplikat (${args.current}/${args.total})...`);
+    case 'done':
+      return txt('Scan complete.', 'Pemindaian selesai.');
+    case 'cancelled':
+      return txt('Scan cancelled.', 'Pemindaian dibatalkan.');
+    case 'error':
+      return st.status_text || txt('Scan failed.', 'Pemindaian gagal.');
+    case 'idle':
+      return txt('Idle', 'Idle');
+    default:
+      return st.status_text || txt('Scanning files...', 'Sedang memindai berkas...');
+  }
+}
+
 function updateStorageProgressBar(st) {
   const pBar = document.getElementById('storage-progress-fill') || document.getElementById('storage-progress-bar');
   const pPct = document.getElementById('storage-progress-pct') || document.getElementById('storage-progress-percentage');
@@ -2022,7 +2369,7 @@ function updateStorageProgressBar(st) {
   const pct = Math.max(0, Math.min(100, st.progress || 0));
   if (pBar) pBar.style.width = `${pct}%`;
   if (pPct) pPct.textContent = `${pct}%`;
-  if (pStatus) pStatus.textContent = st.status_text || 'Sedang memindai berkas...';
+  if (pStatus) pStatus.textContent = storageStatusText(st);
   if (pPath) pPath.textContent = st.current_path || '-';
   if (pCount) {
     const filesStr = (st.files_scanned || 0).toLocaleString();
@@ -2121,7 +2468,7 @@ function renderRecommendationsSubTab() {
       <div class="app-surface p-8 text-center space-y-2">
         <i data-lucide="check-circle-2" class="w-8 h-8 text-emerald-500 mx-auto"></i>
         <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">Sistem Bersih dan Rapi</h4>
-        <p class="text-xs text-zinc-500">Tidak ada penumpukan cache atau berkas sampah di atas 1 MB yang terdeteksi pada target ini.</p>
+        <p class="text-xs text-zinc-500">${txt('No cache build-up or junk files above 1 MB were found on this target.', 'Tidak ada penumpukan cache atau berkas sampah di atas 1 MB pada target ini.')}</p>
       </div>`;
     safeCreateIcons();
     selectedRecommendationIndices.clear();
@@ -2172,7 +2519,7 @@ function renderRecommendationsSubTab() {
               <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">${sizeStr}</div>
               <div class="text-[10px] text-zinc-400">${selectable ? txt('Potential savings', 'Potensi hemat') : txt('Info only', 'Hanya informasi')}</div>
             </div>
-            <button onclick="openInExplorer(decodeURIComponent('${pathArg}'))" class="btn-icon-action px-2.5 py-1.5 rounded text-xs flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-all shadow-xs" title="Buka di File Explorer">
+            <button onclick="openInExplorer(decodeURIComponent('${pathArg}'))" class="btn-icon-action px-2.5 py-1.5 rounded text-xs flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-all shadow-xs" title="${txt('Open in File Explorer', 'Buka di File Explorer')}">
               <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
               <span>${txt('Open', 'Buka')}</span>
             </button>
@@ -2250,7 +2597,14 @@ async function cleanRecommendedItems() {
 
   if (pathsToClean.length === 0) return;
 
-  const confirmMsg = `Yakin ingin membersihkan ${pathsToClean.length} direktori/cache terpilih?\n\nItem yang dibersihkan adalah berkas temporer, cache compiler/package, atau crash dumps yang aman dihapus.`;
+  const confirmMsg = txt(
+    `Clean ${pathsToClean.length} selected cache folders?
+
+Only temporary files, compiler/package caches, and crash dumps are removed.`,
+    `Bersihkan ${pathsToClean.length} folder cache terpilih?
+
+Hanya file sementara, cache compiler/package, dan crash dump yang dihapus.`
+  );
   if (!confirm(confirmMsg)) return;
 
   const btnClean = document.getElementById('btn-clean-recommended');
@@ -2271,12 +2625,12 @@ async function cleanRecommendedItems() {
         showToast(`Pembersihan selesai. Ruang dibebaskan: ${freed} (${result.deleted_count} item).`, 'success');
       }
       await loadStorageDrives();
-      showToast('Jalankan pemindaian ulang untuk memperbarui angka.', 'info');
+      showToast(txt('Run the scan again to refresh the numbers.', 'Jalankan pemindaian ulang untuk memperbarui angka.'), 'info');
     } else {
-      showToast(`Pembersihan gagal: ${result.error || 'Tidak ada path yang diizinkan.'}`, 'error');
+      showToast(txt(`Cleanup failed: ${result.error || 'No allowed path.'}`, `Pembersihan gagal: ${result.error || 'Tidak ada path yang diizinkan.'}`), 'error');
     }
   } catch (err) {
-    showToast(`Terjadi kesalahan: ${err.message}`, 'error');
+    showToast(txt(`Something went wrong: ${err.message}`, `Terjadi kesalahan: ${err.message}`), 'error');
   } finally {
     if (btnClean) btnClean.disabled = false;
   }
@@ -2371,7 +2725,7 @@ function renderLargeItemsSubTab() {
     tbody.innerHTML = `
       <tr>
         <td colspan="5" class="py-8 text-center text-zinc-500 text-xs">
-          Belum ada pemindaian. Pilih target disk lalu klik Mulai Pindai Disk.
+          ${txt('No scan has run. Pick a target drive and start a scan.', 'Belum ada pemindaian. Pilih target disk lalu mulai pindai.')}
         </td>
       </tr>`;
     return;
@@ -2381,7 +2735,7 @@ function renderLargeItemsSubTab() {
     tbody.innerHTML = `
       <tr>
         <td colspan="5" class="py-8 text-center text-zinc-500 text-xs">
-          Tidak ada berkas/folder yang cocok dengan kriteria filter saat ini.
+          ${txt('No file or folder matches the current filters.', 'Tidak ada berkas atau folder yang cocok dengan filter saat ini.')}
         </td>
       </tr>`;
     return;
@@ -2482,7 +2836,7 @@ function renderOldItemsSubTab() {
     tbody.innerHTML = `
       <tr>
         <td colspan="5" class="py-8 text-center text-zinc-500 text-xs">
-          Tidak ada berkas/folder yang lebih tua dari ${storageOldFilterDays} hari pada target saat ini.
+          ${txt(`No file or folder older than ${storageOldFilterDays} days on this target.`, `Tidak ada berkas atau folder lebih tua dari ${storageOldFilterDays} hari pada target ini.`)}
         </td>
       </tr>`;
     return;
@@ -2535,7 +2889,7 @@ function renderDuplicatesSubTab() {
       <div class="app-surface p-8 text-center space-y-2">
         <i data-lucide="hard-drive-download" class="w-8 h-8 text-zinc-400 mx-auto"></i>
         <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">Belum ada pemindaian</h4>
-        <p class="text-xs text-zinc-500">Pemindaian duplikat membutuhkan pembacaan dan hashing berkas pada drive target.</p>
+        <p class="text-xs text-zinc-500">${txt('Duplicate detection reads and hashes files on the target drive.', 'Pemindaian duplikat membaca dan melakukan hashing berkas pada drive target.')}</p>
       </div>`;
     safeCreateIcons();
     updateDuplicateDeleteButton();
@@ -2548,7 +2902,7 @@ function renderDuplicatesSubTab() {
       <div class="app-surface p-8 text-center space-y-2">
         <i data-lucide="check-check" class="w-8 h-8 text-emerald-500 mx-auto"></i>
         <h4 class="text-sm font-bold text-zinc-800 dark:text-zinc-200">Tidak Ditemukan Berkas Duplikat</h4>
-        <p class="text-xs text-zinc-500">Tidak ada kelompok berkas identik pada batas pemindaian ini.</p>
+        <p class="text-xs text-zinc-500">${txt('No identical file groups were found within this scan limit.', 'Tidak ada kelompok berkas identik pada batas pemindaian ini.')}</p>
       </div>`;
     safeCreateIcons();
     updateDuplicateDeleteButton();
@@ -2653,7 +3007,14 @@ async function deleteSelectedDuplicates() {
   const paths = Array.from(selectedDuplicatePaths);
   if (paths.length === 0) return;
 
-  const confirmMsg = `Yakin ingin menghapus permanen ${paths.length} file salinan duplikat terpilih?\n\nFile asli yang dipertahankan tidak akan terhapus.`;
+  const confirmMsg = txt(
+    `Permanently delete ${paths.length} selected duplicate copies?
+
+The original copy you keep will not be deleted.`,
+    `Hapus permanen ${paths.length} salinan duplikat terpilih?
+
+Salinan asli yang dipertahankan tidak akan terhapus.`
+  );
   if (!confirm(confirmMsg)) return;
 
   const btnDelete = document.getElementById('btn-delete-dup');
@@ -2670,7 +3031,7 @@ async function deleteSelectedDuplicates() {
       showToast(`Duplikat dibersihkan. Ruang dibebaskan: ${result.freed_formatted || result.reclaimed_formatted || '0 B'}.`, 'success');
       selectedDuplicatePaths.clear();
       await loadStorageDrives();
-      showToast('Jalankan pemindaian ulang untuk memperbarui daftar duplikat.', 'info');
+      showToast(txt('Run the scan again to refresh duplicates.', 'Jalankan pemindaian ulang untuk memperbarui daftar duplikat.'), 'info');
     } else {
       showToast(`Pembersihan gagal: ${result.error || 'Tidak ada path yang diizinkan.'}`, 'error');
     }
@@ -2692,17 +3053,24 @@ async function openInExplorer(path) {
     });
     const data = await res.json();
     if (!data.success) {
-      showToast(`Gagal membuka Explorer: ${data.error || data.message || 'Jalur tidak ditemukan'}`, 'error');
+      showToast(txt(`Could not open Explorer: ${data.error || data.message || 'Path not found'}`, `Gagal membuka Explorer: ${data.error || data.message || 'Jalur tidak ditemukan'}`), 'error');
     }
   } catch (err) {
-    showToast(`Kesalahan membuka explorer: ${err.message}`, 'error');
+    showToast(txt(`Could not open Explorer: ${err.message}`, `Gagal membuka Explorer: ${err.message}`), 'error');
   }
 }
 
 // Delete a single item with confirmation
 async function deleteSingleItem(path, name) {
   if (!path) return;
-  const confirmMsg = `Yakin ingin menghapus ${name || path}?\n\nTindakan ini akan menghapus berkas dari disk secara permanen.`;
+  const confirmMsg = txt(
+    `Delete ${name || path}?
+
+This removes the file from disk permanently.`,
+    `Hapus ${name || path}?
+
+Tindakan ini menghapus berkas dari disk secara permanen.`
+  );
   if (!confirm(confirmMsg)) return;
 
   try {
@@ -2716,7 +3084,7 @@ async function deleteSingleItem(path, name) {
       showToast(`Berhasil menghapus: ${name || path}. Ruang dibebaskan: ${data.freed_formatted || data.reclaimed_formatted || '0 B'}.`, 'success');
       await loadStorageDrives();
     } else {
-      showToast(`Gagal menghapus: ${data.error || 'Berkas sedang digunakan program lain.'}`, 'error');
+      showToast(txt(`Delete failed: ${data.error || 'The file is in use by another program.'}`, `Gagal menghapus: ${data.error || 'Berkas sedang digunakan program lain.'}`), 'error');
     }
   } catch (err) {
     showToast(`Terjadi kesalahan: ${err.message}`, 'error');
@@ -2824,25 +3192,23 @@ document.addEventListener('keydown', (e) => {
 // ==============================================================================
 let appLogsPollTimer = null;
 
-async function openLogsModal() {
-  const modal = document.getElementById('modal-app-logs');
-  if (!modal) return;
-  modal.classList.remove('hidden');
-  document.body.classList.add('overflow-hidden');
-  safeCreateIcons();
+// Legacy aliases: the log console is now a workspace page, not a modal.
+function openLogsModal() {
+  setMode('logs');
+}
 
-  await fetchAppLogs();
+function closeLogsModal() {
+  if (currentMode === 'logs') setMode('layman');
+}
+
+function startLogsPolling() {
+  fetchAppLogs();
   if (!appLogsPollTimer) {
     appLogsPollTimer = setInterval(fetchAppLogs, 1500);
   }
 }
 
-function closeLogsModal() {
-  const modal = document.getElementById('modal-app-logs');
-  if (!modal) return;
-  modal.classList.add('hidden');
-  document.body.classList.remove('overflow-hidden');
-
+function stopLogsPolling() {
   if (appLogsPollTimer) {
     clearInterval(appLogsPollTimer);
     appLogsPollTimer = null;
@@ -2872,12 +3238,12 @@ function renderAppLogs(logs, logFilePath) {
     pathElem.title = logFilePath;
   }
   if (countElem) {
-    countElem.textContent = `${logs.length} entri`;
+    countElem.textContent = txt(`${logs.length} entries`, `${logs.length} entri`);
   }
   if (!consoleElem) return;
 
   if (logs.length === 0) {
-    consoleElem.innerHTML = '<div class="text-zinc-500 py-4 text-center">Belum ada catatan log aplikasi.</div>';
+    consoleElem.innerHTML = `<div class="text-zinc-500 py-6 text-center font-mono text-xs">${txt('No application log entries yet.', 'Belum ada catatan log aplikasi.')}</div>`;
     return;
   }
 
@@ -2914,10 +3280,10 @@ async function copyLogsToClipboard() {
     if (data.success && data.logs) {
       const textLines = data.logs.map(l => `[${l.timestamp}] [${l.level}] [${l.component}] ${l.message}`).join('\n');
       await navigator.clipboard.writeText(textLines);
-      showToast(txt(`Copied ${data.logs.length} log lines to clipboard.`, `Berhasil menyalin ${data.logs.length} baris log ke clipboard.`), 'success');
+      showToast(txt(`Copied ${data.logs.length} log lines.`, `${data.logs.length} baris log disalin.`), 'success');
     }
   } catch (err) {
-    showToast(`Gagal menyalin log: ${err.message}`, 'error');
+    showToast(txt(`Could not copy logs: ${err.message}`, `Gagal menyalin log: ${err.message}`), 'error');
   }
 }
 
@@ -2926,15 +3292,16 @@ async function openLogFileInNotepad() {
     const res = await apiFetch('/api/open_log_file', { method: 'POST' });
     const data = await res.json();
     if (!data.success) {
-      showToast(`Gagal membuka file log: ${data.error}`, 'error');
+      showToast(txt(`Could not open the log file: ${data.error}`, `Gagal membuka file log: ${data.error}`), 'error');
     }
   } catch (err) {
-    showToast(`Kesalahan membuka file log: ${err.message}`, 'error');
+    showToast(txt(`Could not open the log file: ${err.message}`, `Gagal membuka file log: ${err.message}`), 'error');
   }
 }
 
 async function clearAppLogs() {
-  if (!confirm('Bersihkan seluruh log saat ini?')) return;
+  const prompt = txt('Clear all current log entries?', 'Bersihkan seluruh log saat ini?');
+  if (!confirm(prompt)) return;
   try {
     await apiFetch('/api/clear_logs', { method: 'POST' });
     await fetchAppLogs();
@@ -3111,7 +3478,7 @@ function renderFolderFileList(container, data) {
         <div class="flex items-center gap-3 shrink-0">
           <span class="text-[11px] text-zinc-400 hidden sm:inline tabular-nums">${file.mtime_str || '-'}</span>
           <span class="font-semibold text-zinc-900 dark:text-zinc-100 tabular-nums min-w-[70px] text-right">${file.size_formatted}</span>
-          <button onclick="openInExplorer(decodeURIComponent('${jsPathArg(file.path)}'))" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all" title="Buka berkas di File Explorer">
+          <button onclick="openInExplorer(decodeURIComponent('${jsPathArg(file.path)}'))" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all" title="${txt('Open file in File Explorer', 'Buka berkas di File Explorer')}">
             <i data-lucide="folder-open" class="w-3 h-3"></i>
           </button>
         </div>

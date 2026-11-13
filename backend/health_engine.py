@@ -62,11 +62,29 @@ def _source_note(data_source):
             "id": "Sumber: cache CrystalDiskInfo lokal (data historis, bukan pembacaan live).",
             "en": "Source: local CrystalDiskInfo cache (historical snapshot, not a live read).",
         }
+    if data_source == "windows-health":
+        return {
+            "id": "Sumber: status kesehatan perangkat dari Windows. Register S.M.A.R.T mentah tidak diekspos oleh driver.",
+            "en": "Source: Windows device health status. Raw S.M.A.R.T registers are not exposed by the driver.",
+        }
     return {
         "id": "Sumber: telemetri drive tidak tersedia.",
         "en": "Source: drive telemetry is unavailable.",
     }
 
+
+
+def _unavailable_note(data_source):
+    """Explain a missing health score without blaming the user for a driver limit."""
+    if data_source == "windows-health":
+        return {
+            "id": "Windows melaporkan status kesehatan perangkat. Register S.M.A.R.T mentah tidak diekspos oleh driver, jadi angka keausan tidak dihitung.",
+            "en": "Windows reports the device health status. Raw S.M.A.R.T registers are not exposed by the driver, so no wear percentage is calculated.",
+        }
+    return {
+        "id": "Register mentah dan snapshot cache tidak tersedia. Jalankan aplikasi sebagai Administrator atau buka drive dengan alat pembaca S.M.A.R.T.",
+        "en": "Raw registers and cached snapshots are unavailable. Run as Administrator or read the drive with a S.M.A.R.T-capable tool.",
+    }
 
 def calculate_sata_true_health(model_name, attributes, power_on_hours=0, cdi_life=None, data_source="live-wmi"):
     """Evaluate a SATA SSD from real S.M.A.R.T attributes and/or a CDI health snapshot."""
@@ -224,8 +242,8 @@ def calculate_sata_true_health(model_name, attributes, power_on_hours=0, cdi_lif
         layman_factors.append({
             "title_id": "Data Kesehatan Belum Tersedia",
             "title_en": "Health Data Unavailable",
-            "desc_id": "Register mentah dan snapshot cache tidak tersedia. Jalankan aplikasi sebagai Administrator atau buka drive dengan alat pembaca S.M.A.R.T.",
-            "desc_en": "Raw registers and cached snapshots are unavailable. Run as Administrator or read the drive with a S.M.A.R.T-capable tool.",
+            "desc_id": _unavailable_note(data_source)["id"],
+            "desc_en": _unavailable_note(data_source)["en"],
             "severity": "warning",
         })
 
@@ -383,8 +401,8 @@ def calculate_nvme_true_health(model_name, cdi_smart_data, power_on_hours, vol_i
         layman_factors.append({
             "title_id": "Data Kesehatan NVMe Belum Tersedia",
             "title_en": "NVMe Health Data Unavailable",
-            "desc_id": "Percentage Used tidak dapat dibaca. Jalankan sebagai Administrator atau gunakan cache telemetri yang valid.",
-            "desc_en": "Percentage Used could not be read. Run as Administrator or use a valid telemetry cache.",
+            "desc_id": _unavailable_note(data_source)["id"],
+            "desc_en": _unavailable_note(data_source)["en"],
             "severity": "warning",
         })
 
@@ -530,8 +548,8 @@ def calculate_hdd_health(attributes, power_on_hours=0, temperature=None, data_so
         layman_factors.append({
             "title_id": "Data Kesehatan HDD Belum Tersedia",
             "title_en": "HDD Health Data Unavailable",
-            "desc_id": "Tabel atribut mentah tidak terdeteksi. Jalankan sebagai Administrator.",
-            "desc_en": "The raw attribute table was not detected. Run as Administrator.",
+            "desc_id": _unavailable_note(data_source)["id"],
+            "desc_en": _unavailable_note(data_source)["en"],
             "severity": "warning",
         })
 

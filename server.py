@@ -56,7 +56,7 @@ except ImportError:
 
 PORT = 5550
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-APP_VERSION = "3.1.0"
+APP_VERSION = "3.2.0"
 APP_TOKEN = secrets.token_urlsafe(32)
 MAX_BODY_BYTES = 1024 * 1024
 LOCAL_HOSTNAMES = {"127.0.0.1", "localhost"}

@@ -186,6 +186,7 @@ class StorageManager:
         self.cancel_requested = False
         self.progress = 0
         self.status_text = "Idle"
+        self.status_code = "idle"
         self.current_path = ""
         self.files_scanned = 0
         self.bytes_scanned = 0
@@ -222,6 +223,8 @@ class StorageManager:
                 "is_scanning": self.is_scanning,
                 "progress": self.progress,
                 "status_text": self.status_text,
+                "status_code": getattr(self, "status_code", "idle"),
+                "status_args": getattr(self, "status_args", {}),
                 "current_path": self.current_path,
                 "files_scanned": self.files_scanned,
                 "bytes_scanned": self.bytes_scanned,
@@ -236,6 +239,7 @@ class StorageManager:
             if self.is_scanning:
                 self.cancel_requested = True
                 self.status_text = "Membatalkan pemindaian..."
+                self.status_code = "cancelling"
                 return True
         return False
 
@@ -269,6 +273,7 @@ class StorageManager:
             self.bytes_scanned = 0
             self.scan_truncated = False
             self.status_text = "Menyiapkan pemindaian..."
+            self.status_code = "preparing"
             self.start_time = time.time()
 
         app_logger.log_info("StorageManager", f"Scan initiated. Target drives: {drive_letters}, duplicates: {scan_duplicates}, min_large_mb: {min_large_mb}")
@@ -330,6 +335,7 @@ class StorageManager:
             # 1. Pindai Rekomendasi Pembersihan Cepat
             with self.lock:
                 self.status_text = "Memeriksa cache sistem & sisa instalasi..."
+                self.status_code = "checking_cache"
                 self.progress = 5
             recommendations = self._collect_cleanup_recommendations(target_drives) if include_recommendations else []
             self._register_allowed_paths(target_drives, recommendations)
@@ -343,6 +349,8 @@ class StorageManager:
                 root_path = drv["root"]
                 with self.lock:
                     self.status_text = f"Memindai drive {drv['drive']}..."
+                    self.status_code = "scanning_drive"
+                    self.status_args = {"drive": drv["drive"]}
                     self.current_path = root_path
 
                 # Pindai folder tingkat atas untuk ringkasan ukuran direktori
@@ -425,6 +433,7 @@ class StorageManager:
             if scan_duplicates and not self.cancel_requested:
                 with self.lock:
                     self.status_text = "Menganalisis berkas duplikat..."
+                    self.status_code = "analyzing_duplicates"
                     self.progress = 85
 
                 duplicates_result = self._find_duplicates_from_candidates(size_candidates)
@@ -460,11 +469,13 @@ class StorageManager:
                 }
                 self.progress = 100
                 self.status_text = "Pemindaian selesai!" if not self.cancel_requested else "Pemindaian dibatalkan."
+                self.status_code = "done" if not self.cancel_requested else "cancelled"
                 self.is_scanning = False
 
         except Exception as e:
             with self.lock:
                 self.status_text = f"Error: {e}"
+                self.status_code = "error"
                 self.progress = 100
                 self.is_scanning = False
 
@@ -635,6 +646,8 @@ class StorageManager:
                 first_name = os.path.basename(file_list[0][0]) if file_list else ""
                 self.current_path = f"[Duplikat {g_idx+1}/{total_groups}] {first_name}"
                 self.status_text = f"Menganalisis berkas duplikat ({g_idx+1}/{total_groups})..."
+                self.status_code = "analyzing_duplicates_progress"
+                self.status_args = {"current": g_idx + 1, "total": total_groups}
 
             if (g_idx + 1) % 20 == 0 or g_idx == 0:
                 app_logger.log_info("StorageManager", f"Memproses kelompok duplikat {g_idx+1}/{total_groups}: {file_list[0][0]}")

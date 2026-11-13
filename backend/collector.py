@@ -54,23 +54,31 @@ def query_system_telemetry():
     if admin_mode:
         ps_code = """
         $ErrorActionPreference = 'SilentlyContinue'
-        $disks = Get-PhysicalDisk | Select-Object DeviceId, FriendlyName, MediaType, BusType, Size, HealthStatus, SerialNumber, Model, FirmwareVersion
+        $disks = Get-PhysicalDisk | Select-Object DeviceId, FriendlyName, MediaType, BusType, Size, HealthStatus, OperationalStatus, SerialNumber, FirmwareVersion
+        $diskSource = 'Get-PhysicalDisk'
+        $wmiDisks = Get-CimInstance Win32_DiskDrive | Select-Object @{N='Index';E={[string]$_.Index}}, PNPDeviceID, InterfaceType, @{N='Status';E={$_.Status}}
         if (-not $disks) {
-            $disks = Get-CimInstance Win32_DiskDrive | Select-Object @{N='DeviceId';E={[string]$_.Index}}, @{N='FriendlyName';E={$_.Model}}, @{N='MediaType';E={if ($_.Model -match 'WD20|HDD|WDC') {'HDD'} else {'SSD'}}}, @{N='BusType';E={if ($_.Model -match 'NVMe|LEGEND') {'NVMe'} else {$_.InterfaceType}}}, Size, @{N='HealthStatus';E={$_.Status}}, @{N='SerialNumber';E={$_.SerialNumber}}, @{N='Model';E={$_.Model}}, @{N='FirmwareVersion';E={$_.FirmwareRevision}}
+            $disks = Get-CimInstance Win32_DiskDrive | Select-Object @{N='DeviceId';E={[string]$_.Index}}, @{N='FriendlyName';E={$_.Model}}, @{N='MediaType';E={if ($_.Model -match 'WD20|HDD|WDC') {'HDD'} else {'SSD'}}}, @{N='BusType';E={$_.InterfaceType}}, Size, @{N='HealthStatus';E={$_.Status}}, @{N='OperationalStatus';E={$_.Status}}, @{N='SerialNumber';E={$_.SerialNumber}}, @{N='FirmwareVersion';E={$_.FirmwareRevision}}
+            $diskSource = 'Win32_DiskDrive'
         }
         $parts = Get-Partition | Where-Object { $_.DriveLetter } | Select-Object DiskNumber, PartitionNumber, DriveLetter, Size
         $vols = Get-Volume | Where-Object { $_.DriveLetter } | Select-Object DriveLetter, FileSystemLabel, FileSystem, SizeRemaining, Size
         $smart = Get-CimInstance -Namespace 'root/wmi' -ClassName MSStorageDriver_ATAPISmartData -ErrorAction SilentlyContinue | Select-Object InstanceName, VendorSpecific
         $smartThresh = Get-CimInstance -Namespace 'root/wmi' -ClassName MSStorageDriver_FailurePredictThresholds -ErrorAction SilentlyContinue | Select-Object InstanceName, VendorSpecific
         $reliability = Get-PhysicalDisk | ForEach-Object { $c = $_ | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue; if ($c) { [pscustomobject]@{ DeviceId = [string]$_.DeviceId; Wear = $c.Wear; Temperature = $c.Temperature; PowerOnHours = $c.PowerOnHours; ReadErrorsTotal = $c.ReadErrorsTotal; WriteErrorsTotal = $c.WriteErrorsTotal; StartStopCycleCount = $c.StartStopCycleCount } } }
-        @{ Disks = $disks; Partitions = $parts; Volumes = $vols; Smart = $smart; SmartThresh = $smartThresh; Reliability = $reliability; IsAdmin = $true } | ConvertTo-Json -Depth 4 -Compress
+        @{ Disks = $disks; DiskSource = $diskSource; WmiDisks = $wmiDisks; Partitions = $parts; Volumes = $vols; Smart = $smart; SmartThresh = $smartThresh; Reliability = $reliability; IsAdmin = $true } | ConvertTo-Json -Depth 4 -Compress
         """
-        timeout_sec = 10
+        timeout_sec = 12
     else:
-        # Non-admin fast path: Win32_DiskDrive & Win32_LogicalDisk (selalu terbuka & bebas hang < 0.4s)
+        # Non-admin fast path: Win32_DiskDrive & Win32_LogicalDisk, plus best-effort
+        # Get-PhysicalDisk/Get-StorageReliabilityCounter so NVMe drives still report
+        # wear and Windows health even without elevation.
         ps_code = """
         $ErrorActionPreference = 'SilentlyContinue'
-        $disks = Get-CimInstance Win32_DiskDrive | Select-Object @{N='DeviceId';E={[string]$_.Index}}, @{N='FriendlyName';E={$_.Model}}, @{N='MediaType';E={if ($_.Model -match 'WD20|HDD|WDC') {'HDD'} else {'SSD'}}}, @{N='BusType';E={if ($_.Model -match 'NVMe|LEGEND') {'NVMe'} else {$_.InterfaceType}}}, Size, @{N='HealthStatus';E={$_.Status}}, @{N='SerialNumber';E={$_.SerialNumber}}, @{N='Model';E={$_.Model}}, @{N='FirmwareVersion';E={$_.FirmwareRevision}}
+        $wmiDisks = Get-CimInstance Win32_DiskDrive | Select-Object @{N='Index';E={[string]$_.Index}}, PNPDeviceID, InterfaceType, @{N='Status';E={$_.Status}}
+        $disks = Get-CimInstance Win32_DiskDrive | Select-Object @{N='DeviceId';E={[string]$_.Index}}, @{N='FriendlyName';E={$_.Model}}, @{N='MediaType';E={if ($_.Model -match 'WD20|HDD|WDC') {'HDD'} else {'SSD'}}}, @{N='BusType';E={$_.InterfaceType}}, Size, @{N='HealthStatus';E={$_.Status}}, @{N='OperationalStatus';E={$_.Status}}, @{N='SerialNumber';E={$_.SerialNumber}}, @{N='FirmwareVersion';E={$_.FirmwareRevision}}
+        $physical = Get-PhysicalDisk | Select-Object DeviceId, FriendlyName, MediaType, BusType, Size, HealthStatus, OperationalStatus, SerialNumber, FirmwareVersion
+        $reliability = Get-PhysicalDisk | ForEach-Object { $c = $_ | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue; if ($c) { [pscustomobject]@{ DeviceId = [string]$_.DeviceId; Wear = $c.Wear; Temperature = $c.Temperature; PowerOnHours = $c.PowerOnHours; ReadErrorsTotal = $c.ReadErrorsTotal; WriteErrorsTotal = $c.WriteErrorsTotal; StartStopCycleCount = $c.StartStopCycleCount } } }
         $vols = Get-CimInstance Win32_LogicalDisk | Where-Object { $_.DeviceID } | Select-Object @{N='DriveLetter';E={$_.DeviceID.TrimEnd(':')}}, @{N='FileSystemLabel';E={$_.VolumeName}}, @{N='FileSystem';E={$_.FileSystem}}, @{N='SizeRemaining';E={$_.FreeSpace}}, Size
         $diskVolMap = foreach ($d in Get-CimInstance Win32_DiskDrive) {
             $parts = Get-CimAssociatedInstance -InputObject $d -ResultClassName Win32_DiskPartition -ErrorAction SilentlyContinue
@@ -81,9 +89,9 @@ def query_system_telemetry():
                 }
             }
         }
-        @{ Disks = $disks; Partitions = @(); Volumes = $vols; DiskVolMap = $diskVolMap; Smart = @(); SmartThresh = @(); Reliability = @(); IsAdmin = $false } | ConvertTo-Json -Depth 4 -Compress
+        @{ Disks = $disks; DiskSource = 'Win32_DiskDrive'; WmiDisks = $wmiDisks; PhysicalDisks = $physical; Partitions = @(); Volumes = $vols; DiskVolMap = $diskVolMap; Smart = @(); SmartThresh = @(); Reliability = $reliability; IsAdmin = $false } | ConvertTo-Json -Depth 4 -Compress
         """
-        timeout_sec = 5
+        timeout_sec = 8
 
     startupinfo = None
     creationflags = 0
@@ -109,7 +117,7 @@ def query_system_telemetry():
 
     # Fallback darurat jika PowerShell timeout: coba fast CIM Win32_DiskDrive
     try:
-        fast_code = "Get-CimInstance Win32_DiskDrive | Select-Object @{N='DeviceId';E={[string]$_.Index}}, @{N='FriendlyName';E={$_.Model}}, @{N='MediaType';E={'SSD'}}, @{N='BusType';E={$_.InterfaceType}}, Size, @{N='HealthStatus';E={$_.Status}}, @{N='SerialNumber';E={$_.SerialNumber}}, @{N='Model';E={$_.Model}} | ConvertTo-Json -Compress"
+        fast_code = "Get-CimInstance Win32_DiskDrive | Select-Object @{N='DeviceId';E={[string]$_.Index}}, @{N='FriendlyName';E={$_.Model}}, @{N='MediaType';E={'SSD'}}, @{N='BusType';E={$_.InterfaceType}}, Size, @{N='HealthStatus';E={$_.Status}}, @{N='OperationalStatus';E={$_.Status}}, @{N='SerialNumber';E={$_.SerialNumber}}, PNPDeviceID, FirmwareRevision | ConvertTo-Json -Compress"
         p = subprocess.run(
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", fast_code],
             capture_output=True,
@@ -122,11 +130,11 @@ def query_system_telemetry():
             fallback_disks = json.loads(p.stdout.strip())
             if isinstance(fallback_disks, dict):
                 fallback_disks = [fallback_disks]
-            return {"Disks": fallback_disks, "Partitions": [], "Volumes": [], "Smart": [], "SmartThresh": [], "IsAdmin": admin_mode}
+            return {"Disks": fallback_disks, "DiskSource": "Win32_DiskDrive", "WmiDisks": fallback_disks, "Partitions": [], "Volumes": [], "Smart": [], "SmartThresh": [], "Reliability": [], "IsAdmin": admin_mode}
     except Exception:
         pass
 
-    return {"Disks": [], "Partitions": [], "Volumes": [], "Smart": [], "SmartThresh": [], "IsAdmin": admin_mode}
+    return {"Disks": [], "DiskSource": "Win32_DiskDrive", "WmiDisks": [], "Partitions": [], "Volumes": [], "Smart": [], "SmartThresh": [], "Reliability": [], "IsAdmin": admin_mode}
 
 
 def parse_smart_ini(ini_path, is_nvme=False):
@@ -352,6 +360,24 @@ def _safe_int(value, default=None):
         return default
 
 
+def _sanitize_temperature_c(value):
+    """Return a plausible Celsius reading, or None for sentinel/raw garbage."""
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if 0 < number <= 100 else None
+
+
+def _extract_sata_temperature_c(raw_int):
+    """ATA SMART 0xC2 stores current/min/max across six bytes; current is the LSB."""
+    try:
+        raw_value = int(raw_int)
+    except (TypeError, ValueError):
+        return None
+    return _sanitize_temperature_c(raw_value & 0xFF)
+
+
 def _build_nvme_attributes(temp, poh, poc, percentage_used, host_writes, host_reads, unsafe, media_errors):
     specs = []
     if temp is not None:
@@ -389,16 +415,69 @@ def _build_nvme_attributes(temp, poh, poc, percentage_used, host_writes, host_re
     return attributes
 
 
+def _normalize_windows_health(value):
+    """Map Windows HealthStatus/Status text onto a small stable vocabulary."""
+    text = str(value or "").strip().lower()
+    if text in ("healthy", "ok", "online", "nofault"):
+        return "healthy"
+    if text in ("warning", "degraded", "predictivefailure", "stressed"):
+        return "warning"
+    if text in ("unhealthy", "failed", "error", "lostcommunication", "offline"):
+        return "unhealthy"
+    return None
+
+
+def _find_physical_entry(physical_by_id, device_id, name, size_bytes, serial):
+    """Locate the Get-PhysicalDisk row even when DeviceId numbering differs."""
+    if device_id in physical_by_id:
+        return physical_by_id[device_id]
+    normalized_serial = (serial or "").strip().upper()
+    normalized_name = _normalize_model(name)
+    for entry in physical_by_id.values():
+        entry_serial = str(entry.get("SerialNumber") or "").strip().upper()
+        if normalized_serial and entry_serial and normalized_serial == entry_serial:
+            return entry
+    for entry in physical_by_id.values():
+        entry_name = _normalize_model(entry.get("FriendlyName") or "")
+        entry_size = int(entry.get("Size") or 0)
+        if normalized_name and entry_name and normalized_name in entry_name and entry_size == int(size_bytes or 0):
+            return entry
+    return {}
+
+
 def collect_all_disks_data():
     """Compile disk telemetry while preserving provenance for every reported value."""
     raw_telemetry = query_system_telemetry()
     raw_disks = _as_list(raw_telemetry.get("Disks"))
+    disk_source = raw_telemetry.get("DiskSource") or "Win32_DiskDrive"
     raw_parts = _as_list(raw_telemetry.get("Partitions"))
     raw_vols = _as_list(raw_telemetry.get("Volumes"))
     raw_smart = _as_list(raw_telemetry.get("Smart"))
     raw_smart_thresh = _as_list(raw_telemetry.get("SmartThresh"))
     raw_reliability = _as_list(raw_telemetry.get("Reliability"))
     disk_vol_map = _as_list(raw_telemetry.get("DiskVolMap"))
+
+    physical_by_id = {}
+    for entry in _as_list(raw_telemetry.get("PhysicalDisks")):
+        if isinstance(entry, dict) and entry.get("DeviceId") is not None:
+            physical_by_id[str(entry.get("DeviceId"))] = entry
+    wmi_by_id = {}
+    for entry in _as_list(raw_telemetry.get("WmiDisks")):
+        if isinstance(entry, dict):
+            index = entry.get("Index")
+            if index is None:
+                index = entry.get("DeviceId")
+            if index is not None:
+                wmi_by_id[str(index)] = entry
+    if disk_source == "Get-PhysicalDisk":
+        for entry in raw_disks:
+            if isinstance(entry, dict) and entry.get("DeviceId") is not None:
+                physical_by_id.setdefault(str(entry.get("DeviceId")), entry)
+    else:
+        for entry in raw_disks:
+            if isinstance(entry, dict) and entry.get("DeviceId") is not None:
+                # Keep the richer Win32_DiskDrive row (PNPDeviceID) when both exist.
+                wmi_by_id.setdefault(str(entry.get("DeviceId")), entry)
 
     reliability_by_id = {}
     for entry in raw_reliability:
@@ -472,6 +551,40 @@ def collect_all_disks_data():
         size_bytes = disk.get("Size", 0) or 0
         size_gb = round(size_bytes / (1024**3), 1) if size_bytes else None
 
+        wmi_entry = wmi_by_id.get(device_id, {})
+        physical_entry = _find_physical_entry(physical_by_id, device_id, name, size_bytes, serial)
+        pnp_device_id = (
+            disk.get("PNPDeviceID")
+            or wmi_entry.get("PNPDeviceID")
+            or physical_entry.get("PNPDeviceID")
+            or ""
+        )
+
+        if physical_entry:
+            bus_type = physical_entry.get("BusType") or bus_type
+            media_type = physical_entry.get("MediaType") or media_type
+        windows_status_raw = (
+            physical_entry.get("HealthStatus")
+            or disk.get("HealthStatus")
+            or wmi_entry.get("Status")
+        )
+        windows_operational = (
+            physical_entry.get("OperationalStatus")
+            or disk.get("OperationalStatus")
+            or wmi_entry.get("Status")
+        )
+        windows_status = _normalize_windows_health(windows_status_raw)
+
+        health_source = "windows-health" if windows_status else "unavailable"
+        is_nvme = any(
+            "NVME" in str(value).upper()
+            for value in (bus_type, name, pnp_device_id)
+        )
+        if is_nvme and "NVME" not in str(bus_type).upper():
+            # Win32_DiskDrive reports NVMe drives as InterfaceType "SCSI".
+            bus_type = "NVMe"
+
+
         volumes = disk_vols.get(device_id, [])
         drive_letters = [v["drive_letter"] for v in volumes]
         drive_letters_str = ", ".join(f"{letter}:" for letter in drive_letters) if drive_letters else "-"
@@ -491,19 +604,18 @@ def collect_all_disks_data():
         reliability = reliability_by_id.get(device_id, {})
 
         cache_life = _safe_int(matched_props.get("Life"))
-        cache_temp = _safe_int(matched_props.get("Temperature"))
+        cache_temp = _sanitize_temperature_c(matched_props.get("Temperature"))
         cache_poh = _safe_int(matched_props.get("PowerOnHours"))
         cache_poc = _safe_int(matched_props.get("PowerOnCount"))
         cache_host_writes = _safe_int(matched_props.get("HostWrites"))
         cache_host_reads = _safe_int(matched_props.get("HostReads"))
-        reliability_temp = _safe_int(reliability.get("Temperature"))
+        reliability_temp = _sanitize_temperature_c(reliability.get("Temperature"))
         reliability_poh = _safe_int(reliability.get("PowerOnHours"))
         reliability_poc = _safe_int(reliability.get("StartStopCycleCount"))
         reliability_wear = _safe_int(reliability.get("Wear"))
 
-        is_nvme = "NVME" in bus_type.upper() or "NVME" in name.upper()
         smart_attributes = []
-        data_source = "unavailable"
+        data_source = health_source
 
         if is_nvme:
             cache_temp = cache_temp if cache_temp is not None else reliability_temp
@@ -574,7 +686,7 @@ def collect_all_disks_data():
                 data_source = "cdi-cache"
 
             attr_map = {a.get("id"): a for a in smart_attributes}
-            attr_temp = _safe_int(attr_map.get(0xC2, {}).get("raw_int"))
+            attr_temp = _extract_sata_temperature_c(attr_map.get(0xC2, {}).get("raw_int"))
             attr_poh = _safe_int(attr_map.get(0x09, {}).get("raw_int"))
             attr_poc = _safe_int(attr_map.get(0x0C, {}).get("raw_int"))
             temp = attr_temp if attr_temp is not None else cache_temp
@@ -599,6 +711,37 @@ def collect_all_disks_data():
 
         hw_profile = detect_hardware_profile(name, media_type, bus_type, size_gb or 0, smart_attributes)
 
+        # Windows still reports a device-level health verdict for drives whose
+        # SMART registers the driver does not expose. Use it as evidence, never
+        # as a fabricated percentage.
+        if health_analysis.get("true_health") is None and windows_status:
+            data_source = "windows-health"
+        health_analysis["data_source"] = data_source
+        if health_analysis.get("true_health") is None and windows_status:
+            labels = {
+                "healthy": ("Sehat (Windows)", "Healthy (Windows)", "emerald"),
+                "warning": ("Perlu Perhatian (Windows)", "Warning (Windows)", "amber"),
+                "unhealthy": ("Tidak Sehat (Windows)", "Unhealthy (Windows)", "rose"),
+            }
+            label_id, label_en, color = labels[windows_status]
+            health_analysis["status_label_id"] = label_id
+            health_analysis["status_label_en"] = label_en
+            health_analysis["status_badge_color"] = color
+
+        telemetry_reason = None
+        if health_analysis.get("true_health") is None:
+            if not admin_mode:
+                telemetry_reason = "not-elevated"
+            elif is_nvme:
+                telemetry_reason = "nvme-smart-not-exposed"
+            else:
+                telemetry_reason = "smart-not-exposed"
+
+        if isinstance(windows_operational, str):
+            operational_list = [windows_operational] if windows_operational else []
+        else:
+            operational_list = _as_list(windows_operational)
+
         results.append({
             "device_id": device_id,
             "name": name,
@@ -619,6 +762,14 @@ def collect_all_disks_data():
             "data_source": data_source,
             "data_source_date": cache_date,
             "data_gaps": health_analysis.get("data_gaps", []),
+            "windows_health": {
+                "status": windows_status,
+                "raw_status": windows_status_raw,
+                "operational_status": operational_list,
+                "source": "Get-PhysicalDisk" if physical_entry else ("Win32_DiskDrive" if wmi_entry else None),
+            },
+            "telemetry_reason": telemetry_reason,
+            "is_nvme": is_nvme,
             "is_admin": admin_mode,
         })
 
