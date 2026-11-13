@@ -15,7 +15,8 @@ SPEC_FILE = ROOT / "DiagnoseMyDisk.spec"
 INSTALLER_SCRIPT = ROOT / "installer.iss"
 DIST_APP = ROOT / "dist" / "DiagnoseMyDisk"
 SETUP_EXE = ROOT / "installer_output" / "DiagnoseMyDisk_Setup.exe"
-INSTALL_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "Programs" / "DiagnoseMyDisk"
+DEFAULT_INSTALL_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "Programs" / "DiagnoseMyDisk"
+INSTALL_DIR = Path(os.environ.get("DMD_INSTALL_DIR") or DEFAULT_INSTALL_DIR)
 INSTALLED_EXE = INSTALL_DIR / "DiagnoseMyDisk.exe"
 LOG_FILE = ROOT / "deploy_local.log"
 
