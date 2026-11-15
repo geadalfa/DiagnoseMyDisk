@@ -27,6 +27,7 @@ class TestVersionParsing(unittest.TestCase):
         self.assertEqual(parse_version("v3.2.0"), (3, 2, 0))
         self.assertEqual(parse_version("3.2.1"), (3, 2, 1))
         self.assertEqual(parse_version("v1.0.0-rc1"), (1, 0, 0))
+        self.assertEqual(parse_version("0.3.5.0"), (0, 3, 5, 0))
         self.assertEqual(parse_version(""), (0, 0, 0))
         self.assertEqual(parse_version(None), (0, 0, 0))
 
@@ -35,6 +36,8 @@ class TestVersionParsing(unittest.TestCase):
         self.assertEqual(compare_versions("v3.2.0", "3.2.0"), 0)
         self.assertEqual(compare_versions("3.1.9", "3.2.0"), -1)
         self.assertEqual(compare_versions("4.0.0", "3.99.99"), 1)
+        self.assertEqual(compare_versions("0.3.5.1", "0.3.5.0"), 1)
+        self.assertEqual(compare_versions("0.3.5.0", "0.3.5.0"), 0)
 
     def test_is_newer_version(self):
         self.assertTrue(is_newer_version("3.2.1", "3.2.0"))
@@ -132,8 +135,8 @@ class TestUpdateManager(unittest.TestCase):
         valid_sha256 = hashlib.sha256(fake_binary).hexdigest()
 
         self.mgr.latest_release_info = {
-            "download_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk_Setup.exe",
-            "checksum_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/SHA256SUMS.txt",
+            "download_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk_Setup.exe",
+            "checksum_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/SHA256SUMS.txt",
             "setup_filename": "DiagnoseMyDisk_Setup.exe",
             "download_size": len(fake_binary),
         }
@@ -169,8 +172,8 @@ class TestUpdateManager(unittest.TestCase):
         mismatch_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 
         self.mgr.latest_release_info = {
-            "download_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk_Setup.exe",
-            "checksum_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/SHA256SUMS.txt",
+            "download_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk_Setup.exe",
+            "checksum_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/SHA256SUMS.txt",
             "setup_filename": "DiagnoseMyDisk_Setup.exe",
             "download_size": len(fake_binary),
         }

@@ -158,6 +158,9 @@ class TestStorageManagerEngine(unittest.TestCase):
         self.assertFalse(os.path.exists(self.file_copy))
         self.assertTrue(os.path.exists(self.file_orig))
         self.assertEqual(len(result["rejected"]), 0)
+        self.assertIn(self.file_copy, result.get("cleaned_paths", []))
+        self.assertIn("before_stats", result)
+        self.assertIn("after_stats", result)
 
     def test_cleanup_rejects_large_directory(self):
         self._scan()

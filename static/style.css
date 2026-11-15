@@ -372,6 +372,12 @@ html.dark .shimmer-masking, body.dark .shimmer-masking, body.dark-theme .shimmer
   100% { background-position: 200% 0; }
 }
 
+.progress-shimmer {
+  background: linear-gradient(90deg, #3b82f6 0%, #6366f1 50%, #3b82f6 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
 /* Table layout stability */
 table {
   border-spacing: 0;

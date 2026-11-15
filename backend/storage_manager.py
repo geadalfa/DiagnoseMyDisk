@@ -1145,6 +1145,32 @@ class StorageManager:
 
             selected.append(raw_path)
 
+        # Collect affected drive roots for before/after measurement
+        affected_drives = set()
+        for p in list(selected) + list(recycle_targets):
+            try:
+                drv, _ = os.path.splitdrive(os.path.abspath(p))
+                if drv and drv[:1].isalpha():
+                    affected_drives.add(drv.upper())
+            except Exception:
+                pass
+
+        before_stats = {}
+        for d in affected_drives:
+            try:
+                root_path = d + "\\" if not d.endswith("\\") else d
+                usage = shutil.disk_usage(root_path)
+                before_stats[d] = {
+                    "total": usage.total,
+                    "used": usage.used,
+                    "free": usage.free,
+                    "free_formatted": format_bytes(usage.free),
+                    "used_formatted": format_bytes(usage.used),
+                    "total_formatted": format_bytes(usage.total),
+                }
+            except Exception:
+                pass
+
         result = execute_cleanup(selected)
 
         for rb_path in recycle_targets:
@@ -1158,12 +1184,38 @@ class StorageManager:
             if ok:
                 result["freed_bytes"] += before
                 result["deleted_count"] += 1
+                if "cleaned_paths" in result:
+                    result["cleaned_paths"].append(rb_path)
             else:
                 result["errors"].append(f"Recycle Bin {letter}: {output}")
+
+        after_stats = {}
+        for d in affected_drives:
+            try:
+                root_path = d + "\\" if not d.endswith("\\") else d
+                usage = shutil.disk_usage(root_path)
+                after_stats[d] = {
+                    "total": usage.total,
+                    "used": usage.used,
+                    "free": usage.free,
+                    "free_formatted": format_bytes(usage.free),
+                    "used_formatted": format_bytes(usage.used),
+                    "total_formatted": format_bytes(usage.total),
+                }
+            except Exception:
+                pass
 
         result["freed_formatted"] = format_bytes(result["freed_bytes"])
         result["reclaimed_formatted"] = result["freed_formatted"]
         result["rejected"] = rejected
+        result["before_stats"] = before_stats
+        result["after_stats"] = after_stats
+
+        with self.lock:
+            for cp in result.get("cleaned_paths", []):
+                norm_cp = _norm_path(cp)
+                self.allowed_clean_files.discard(norm_cp)
+
         if rejected:
             app_logger.log_warn("StorageManager", f"Rejected cleanup paths: {len(rejected)}")
         return result
@@ -1248,9 +1300,11 @@ def execute_cleanup(paths_to_clean):
     freed_bytes = 0
     deleted_count = 0
     errors = []
+    cleaned_paths = []
 
     for item_path in paths_to_clean:
         if not os.path.exists(item_path):
+            cleaned_paths.append(item_path)
             continue
         if _is_protected_dir(item_path):
             errors.append(f"{os.path.basename(item_path)}: direktori sistem dilindungi")
@@ -1262,6 +1316,7 @@ def execute_cleanup(paths_to_clean):
                 os.remove(item_path)
                 freed_bytes += sz
                 deleted_count += 1
+                cleaned_paths.append(item_path)
             elif os.path.isdir(item_path):
                 # Khusus direktori: hapus isi berkas di dalamnya untuk keamanan
                 for root, dirs, files in os.walk(item_path, topdown=False):
@@ -1280,6 +1335,7 @@ def execute_cleanup(paths_to_clean):
                             os.rmdir(dp)
                         except Exception:
                             pass
+                cleaned_paths.append(item_path)
         except Exception as e:
             errors.append(f"{os.path.basename(item_path)}: {e}")
 
@@ -1289,6 +1345,7 @@ def execute_cleanup(paths_to_clean):
         "freed_formatted": format_bytes(freed_bytes),
         "reclaimed_formatted": format_bytes(freed_bytes),
         "deleted_count": deleted_count,
+        "cleaned_paths": cleaned_paths,
         "errors": errors,
         "rejected": [],
     }

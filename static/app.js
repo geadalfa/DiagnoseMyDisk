@@ -820,6 +820,31 @@ function setLanguage(lang, triggerRender = true) {
   if (btnOnbId) btnOnbId.classList.toggle('is-active', currentLang === 'id');
   if (btnOnbEn) btnOnbEn.classList.toggle('is-active', currentLang === 'en');
 
+  // Cleanup modals elements
+  const clProgressTitle = document.getElementById('cleanup-progress-title');
+  if (clProgressTitle) clProgressTitle.textContent = currentLang === 'en' ? 'Cleaning Storage...' : 'Sedang Membersihkan Disk...';
+  const clProgressDesc = document.getElementById('cleanup-progress-desc');
+  if (clProgressDesc) clProgressDesc.textContent = currentLang === 'en' ? 'Safely deleting selected cache and temporary files...' : 'Menghapus berkas sementara dan cache aplikasi terpilih secara aman...';
+  const clProgressStatus = document.getElementById('cleanup-progress-status');
+  if (clProgressStatus) clProgressStatus.textContent = currentLang === 'en' ? 'Please wait, personal files and system essentials are never touched.' : 'Mohon tunggu sejenak, proses ini tidak menyentuh data pribadi Anda.';
+
+  const clCompTitle = document.getElementById('cleanup-complete-title');
+  if (clCompTitle) clCompTitle.textContent = currentLang === 'en' ? 'Cleaning Completed!' : 'Pembersihan Selesai!';
+  const clCompSub = document.getElementById('cleanup-complete-subtitle');
+  if (clCompSub) clCompSub.textContent = currentLang === 'en' ? 'Disk storage space has been reclaimed safely.' : 'Ruang penyimpanan disk berhasil dibebaskan dengan aman.';
+  const lblSpaceBefore = document.getElementById('lbl-space-before');
+  if (lblSpaceBefore) lblSpaceBefore.textContent = currentLang === 'en' ? 'Free Space Before' : 'Ruang Bebas Awal';
+  const lblSpaceAfter = document.getElementById('lbl-space-after');
+  if (lblSpaceAfter) lblSpaceAfter.textContent = currentLang === 'en' ? 'Free Space After' : 'Ruang Bebas Akhir';
+  const lblItemsCleaned = document.getElementById('lbl-items-cleaned');
+  if (lblItemsCleaned) lblItemsCleaned.textContent = currentLang === 'en' ? 'Items Cleaned' : 'Item Dibersihkan';
+  const lblCleanedItemsTitle = document.getElementById('lbl-cleaned-items-title');
+  if (lblCleanedItemsTitle) lblCleanedItemsTitle.textContent = currentLang === 'en' ? 'Cleaned Items & Folders:' : 'Daftar Item yang Berhasil Dibersihkan:';
+  const clFooterTip = document.getElementById('cleanup-footer-tip');
+  if (clFooterTip) clFooterTip.textContent = currentLang === 'en' ? 'Recommendation list and storage numbers have been refreshed automatically.' : 'Daftar rekomendasi telah diperbarui secara otomatis.';
+  const btnTxtCleanupDone = document.getElementById('btn-txt-cleanup-done');
+  if (btnTxtCleanupDone) btnTxtCleanupDone.textContent = currentLang === 'en' ? 'Done' : 'Selesai';
+
   if (allDisks && allDisks.length > 0 && allDisks[activeDiskIndex]) {
     renderActionRecommendations(allDisks[activeDiskIndex]);
     renderHealthHistory(allDisks[activeDiskIndex]);
@@ -2266,6 +2291,7 @@ function closeGlossaryModal() {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeGlossaryModal();
+    closeCleanupCompleteModal();
   }
 });
 
@@ -2918,8 +2944,18 @@ function updateRecommendationSummary() {
 async function cleanRecommendedItems() {
   const items = (storageResults && storageResults.recommendations) || [];
   const pathsToClean = [];
+  const selectedItemsMeta = [];
+
   selectedRecommendationIndices.forEach((idx) => {
-    if (items[idx] && items[idx].path) pathsToClean.push(items[idx].path);
+    if (items[idx] && items[idx].path) {
+      pathsToClean.push(items[idx].path);
+      selectedItemsMeta.push({
+        category: items[idx].category || 'Cache',
+        path: items[idx].path,
+        size: items[idx].size || 0,
+        sizeFormatted: formatStorageBytes(items[idx].size || 0)
+      });
+    }
   });
 
   if (pathsToClean.length === 0) return;
@@ -2935,7 +2971,25 @@ Hanya file sementara, cache compiler/package, dan crash dump yang dihapus.`
   if (!confirm(confirmMsg)) return;
 
   const btnClean = document.getElementById('btn-clean-recommended');
+  const btnCleanText = document.getElementById('txt-btn-clean-rec');
+
+  // Determine target drive letter
+  let targetDriveLetter = 'C:';
+  if (selectedStorageDrive && selectedStorageDrive !== 'all') {
+    targetDriveLetter = selectedStorageDrive;
+  } else if (pathsToClean.length > 0 && pathsToClean[0].match(/^[a-zA-Z]:/)) {
+    targetDriveLetter = pathsToClean[0].substring(0, 2).toUpperCase();
+  }
+  const driveBefore = storageDrives.find(d => (d.drive || '').toUpperCase() === targetDriveLetter.toUpperCase());
+  const spaceBeforeBytes = driveBefore ? driveBefore.free : (storageResults?.breakdown?.total_free || 0);
+
+  // 1. Show active progress feedback immediately
   if (btnClean) btnClean.disabled = true;
+  if (btnCleanText) {
+    btnCleanText.innerHTML = '<span class="inline-flex items-center gap-1.5"><i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> ' + (currentLang === 'en' ? 'Cleaning...' : 'Membersihkan...') + '</span>';
+  }
+  openCleanupProgressModal(pathsToClean.length);
+  safeCreateIcons();
 
   try {
     const res = await apiFetch('/api/storage/clean', {
@@ -2945,21 +2999,64 @@ Hanya file sementara, cache compiler/package, dan crash dump yang dihapus.`
     });
     const result = await res.json();
     const freed = result.freed_formatted || result.reclaimed_formatted || '0 B';
+
     if (result.success) {
-      if (result.rejected && result.rejected.length > 0) {
-        showToast(`Dibersihkan ${freed}. ${result.rejected.length} path ditolak oleh pengaman.`, 'warning', 6000);
-      } else {
-        showToast(`Pembersihan selesai. Ruang dibebaskan: ${freed} (${result.deleted_count} item).`, 'success');
+      // 2. Filter out deleted folders from recommendations so they are immediately removed from view
+      const cleanedPaths = result.cleaned_paths || pathsToClean;
+      const cleanedSet = new Set(cleanedPaths.map(p => (p || '').toLowerCase().trim()));
+
+      if (storageResults && storageResults.recommendations) {
+        storageResults.recommendations = storageResults.recommendations.filter(
+          item => !cleanedSet.has((item.path || '').toLowerCase().trim())
+        );
       }
+
+      // Update badge counts and selection
+      setElementText('badge-recommend-count', storageResults ? (storageResults.recommendations || []).length : 0);
+      selectedRecommendationIndices.clear();
+
+      // 3. Refresh storage drives from OS for genuine free space
       await loadStorageDrives();
-      showToast(txt('Run the scan again to refresh the numbers.', 'Jalankan pemindaian ulang untuk memperbarui angka.'), 'info');
+
+      // 4. Calculate after space from refreshed drive info
+      const driveAfter = storageDrives.find(d => (d.drive || '').toUpperCase() === targetDriveLetter.toUpperCase());
+      const spaceAfterBytes = driveAfter ? driveAfter.free : (spaceBeforeBytes + (result.freed_bytes || 0));
+
+      // 5. Update breakdown & segmented bar
+      if (storageResults && storageResults.breakdown) {
+        storageResults.breakdown.total_free = spaceAfterBytes;
+        storageResults.breakdown.total_used = Math.max(0, (storageResults.breakdown.total_used || 0) - (result.freed_bytes || 0));
+        updateDriveUsageHero();
+      }
+
+      // 6. Re-render recommendations subtab immediately
+      renderRecommendationsSubTab();
+
+      // 7. Close progress modal & open completion popup with before vs after
+      closeCleanupProgressModal();
+
+      openCleanupCompleteModal({
+        drive: `Drive ${targetDriveLetter}`,
+        spaceBefore: formatStorageBytes(spaceBeforeBytes),
+        spaceAfter: formatStorageBytes(spaceAfterBytes),
+        freedStr: freed,
+        count: selectedItemsMeta.length,
+        items: selectedItemsMeta,
+        rejected: result.rejected || [],
+        errors: result.errors || []
+      });
+
     } else {
+      closeCleanupProgressModal();
       showToast(txt(`Cleanup failed: ${result.error || 'No allowed path.'}`, `Pembersihan gagal: ${result.error || 'Tidak ada path yang diizinkan.'}`), 'error');
     }
   } catch (err) {
+    closeCleanupProgressModal();
     showToast(txt(`Something went wrong: ${err.message}`, `Terjadi kesalahan: ${err.message}`), 'error');
   } finally {
     if (btnClean) btnClean.disabled = false;
+    updateRecommendationSummary();
+    safeCreateIcons();
   }
 }
 
@@ -3347,6 +3444,17 @@ Salinan asli yang dipertahankan tidak akan terhapus.`
   const btnDelete = document.getElementById('btn-delete-dup');
   if (btnDelete) btnDelete.disabled = true;
 
+  // Determine drive
+  let targetDriveLetter = 'C:';
+  if (paths.length > 0 && paths[0].match(/^[a-zA-Z]:/)) {
+    targetDriveLetter = paths[0].substring(0, 2).toUpperCase();
+  }
+  const driveBefore = storageDrives.find(d => (d.drive || '').toUpperCase() === targetDriveLetter.toUpperCase());
+  const spaceBeforeBytes = driveBefore ? driveBefore.free : (storageResults?.breakdown?.total_free || 0);
+
+  openCleanupProgressModal(paths.length, txt('Cleaning Duplicate Files...', 'Membersihkan Berkas Duplikat...'), txt(`Deleting ${paths.length} selected duplicate copies...`, `Menghapus ${paths.length} salinan duplikat terpilih...`));
+  safeCreateIcons();
+
   try {
     const res = await apiFetch('/api/storage/clean', {
       method: 'POST',
@@ -3354,18 +3462,64 @@ Salinan asli yang dipertahankan tidak akan terhapus.`
       body: JSON.stringify({ paths })
     });
     const result = await res.json();
+    const freed = result.freed_formatted || result.reclaimed_formatted || '0 B';
+
     if (result.success) {
-      showToast(`Duplikat dibersihkan. Ruang dibebaskan: ${result.freed_formatted || result.reclaimed_formatted || '0 B'}.`, 'success');
+      const cleanedPaths = result.cleaned_paths || paths;
+      const cleanedSet = new Set(cleanedPaths.map(p => (p || '').toLowerCase().trim()));
+
+      // Remove deleted files from duplicate_groups
+      if (storageResults && storageResults.duplicate_groups) {
+        storageResults.duplicate_groups.forEach(group => {
+          if (group.files) {
+            group.files = group.files.filter(f => !cleanedSet.has((f.path || '').toLowerCase().trim()));
+          }
+        });
+        storageResults.duplicate_groups = storageResults.duplicate_groups.filter(group => (group.files || []).length > 1);
+      }
+
       selectedDuplicatePaths.clear();
+      setElementText('badge-dup-count', storageResults ? (storageResults.duplicate_groups || []).length : 0);
+
       await loadStorageDrives();
-      showToast(txt('Run the scan again to refresh duplicates.', 'Jalankan pemindaian ulang untuk memperbarui daftar duplikat.'), 'info');
+
+      const driveAfter = storageDrives.find(d => (d.drive || '').toUpperCase() === targetDriveLetter.toUpperCase());
+      const spaceAfterBytes = driveAfter ? driveAfter.free : (spaceBeforeBytes + (result.freed_bytes || 0));
+
+      if (storageResults && storageResults.breakdown) {
+        storageResults.breakdown.total_free = spaceAfterBytes;
+        storageResults.breakdown.total_used = Math.max(0, (storageResults.breakdown.total_used || 0) - (result.freed_bytes || 0));
+        updateDriveUsageHero();
+      }
+
+      renderDuplicatesSubTab();
+      closeCleanupProgressModal();
+
+      openCleanupCompleteModal({
+        drive: `Drive ${targetDriveLetter}`,
+        spaceBefore: formatStorageBytes(spaceBeforeBytes),
+        spaceAfter: formatStorageBytes(spaceAfterBytes),
+        freedStr: freed,
+        count: paths.length,
+        items: paths.map(p => ({
+          category: txt('Duplicate File', 'Berkas Duplikat'),
+          path: p,
+          sizeFormatted: ''
+        })),
+        rejected: result.rejected || [],
+        errors: result.errors || []
+      });
+
     } else {
-      showToast(`Pembersihan gagal: ${result.error || 'Tidak ada path yang diizinkan.'}`, 'error');
+      closeCleanupProgressModal();
+      showToast(txt(`Cleanup failed: ${result.error || 'No allowed path.'}`, `Pembersihan gagal: ${result.error || 'Tidak ada path yang diizinkan.'}`), 'error');
     }
   } catch (err) {
+    closeCleanupProgressModal();
     showToast(`Terjadi kesalahan: ${err.message}`, 'error');
   } finally {
     if (btnDelete) btnDelete.disabled = false;
+    safeCreateIcons();
   }
 }
 
@@ -3409,6 +3563,17 @@ Tindakan ini menghapus berkas dari disk secara permanen.`
     const data = await res.json();
     if (data.success) {
       showToast(`Berhasil menghapus: ${name || path}. Ruang dibebaskan: ${data.freed_formatted || data.reclaimed_formatted || '0 B'}.`, 'success');
+      const pNorm = (path || '').toLowerCase().trim();
+      if (storageResults && storageResults.large_items) {
+        storageResults.large_items = storageResults.large_items.filter(item => (item.path || '').toLowerCase().trim() !== pNorm);
+        setElementText('badge-large-count', storageResults.large_items.length);
+        renderLargeItemsSubTab();
+      }
+      if (storageResults && storageResults.old_items) {
+        storageResults.old_items = storageResults.old_items.filter(item => (item.path || '').toLowerCase().trim() !== pNorm);
+        setElementText('badge-old-count', storageResults.old_items.length);
+        renderOldItemsSubTab();
+      }
       await loadStorageDrives();
     } else {
       showToast(txt(`Delete failed: ${data.error || 'The file is in use by another program.'}`, `Gagal menghapus: ${data.error || 'Berkas sedang digunakan program lain.'}`), 'error');
@@ -3481,7 +3646,7 @@ function exportDiagnosticReport() {
       footer{margin-top:32px;color:#71717a;font-size:12px}
     </style></head><body>
     <h1>DiagnoseMyDisk Diagnostic Report</h1>
-    <p>Generated ${new Date().toLocaleString()} · App version 3.4.0 · Local-only, zero telemetry</p>
+    <p>Generated ${new Date().toLocaleString()} · App version 0.3.5.0 · Local-only, zero telemetry</p>
     ${diskSections}
     ${storageSection}
     <footer>Every unavailable field is reported as N/A or listed as a data gap. This report was generated locally and was not uploaded anywhere.</footer>
@@ -4079,4 +4244,133 @@ function completeOnboarding() {
   }
   closeOnboardingModal();
   showToast(currentLang === 'en' ? 'Welcome to DiagnoseMyDisk! Ready.' : 'Selamat datang di DiagnoseMyDisk! Siap digunakan.', 'success');
+}
+
+
+
+// ==============================================================================
+// STORAGE CLEANUP PROGRESS & COMPLETION CONTROLLERS
+// ==============================================================================
+function openCleanupProgressModal(count, titleText, descText) {
+  const modal = document.getElementById('cleanup-progress-modal');
+  const titleEl = document.getElementById('cleanup-progress-title');
+  const descEl = document.getElementById('cleanup-progress-desc');
+  const statusEl = document.getElementById('cleanup-progress-status');
+
+  if (titleEl) {
+    titleEl.textContent = titleText || (currentLang === 'en' ? 'Cleaning Storage...' : 'Sedang Membersihkan Disk...');
+  }
+  if (descEl) {
+    descEl.textContent = descText || (currentLang === 'en'
+      ? `Safely deleting ${count || ''} selected cache items...`
+      : `Menghapus ${count || ''} item cache terpilih secara aman...`);
+  }
+  if (statusEl) {
+    statusEl.textContent = currentLang === 'en'
+      ? 'Please wait, personal files and system essentials are never touched.'
+      : 'Mohon tunggu sejenak, proses ini tidak menyentuh data pribadi Anda.';
+  }
+  if (modal) {
+    modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+  }
+  safeCreateIcons();
+}
+
+function closeCleanupProgressModal() {
+  const modal = document.getElementById('cleanup-progress-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+  }
+}
+
+function openCleanupCompleteModal(opts) {
+  const modal = document.getElementById('cleanup-complete-modal');
+  if (!modal) return;
+
+  const targetDriveEl = document.getElementById('cleanup-target-drive');
+  const freedBadgeEl = document.getElementById('cleanup-freed-badge');
+  const spaceBeforeEl = document.getElementById('cleanup-space-before');
+  const spaceAfterEl = document.getElementById('cleanup-space-after');
+  const countSummaryEl = document.getElementById('cleanup-count-summary');
+  const itemsListEl = document.getElementById('cleanup-items-list');
+  const warningsBox = document.getElementById('cleanup-warnings-box');
+  const warningsDesc = document.getElementById('cleanup-warnings-desc');
+
+  // Set Drive badge
+  if (targetDriveEl) {
+    targetDriveEl.textContent = opts.drive || 'Drive C:';
+  }
+
+  // Set Freed badge
+  if (freedBadgeEl) {
+    const freedText = opts.freedStr || '0 B';
+    freedBadgeEl.textContent = currentLang === 'en' ? `+${freedText} Reclaimed` : `+${freedText} Dibebaskan`;
+  }
+
+  // Set Before vs After Space
+  if (spaceBeforeEl) spaceBeforeEl.textContent = opts.spaceBefore || '--';
+  if (spaceAfterEl) spaceAfterEl.textContent = opts.spaceAfter || '--';
+
+  // Set Items Count
+  if (countSummaryEl) {
+    countSummaryEl.textContent = currentLang === 'en'
+      ? `${opts.count || 0} items`
+      : `${opts.count || 0} folder/item`;
+  }
+
+  // Render Cleaned Items List
+  if (itemsListEl) {
+    const items = opts.items || [];
+    if (items.length === 0) {
+      itemsListEl.innerHTML = `<div class="p-3 text-center text-zinc-500">${currentLang === 'en' ? 'Cleanup executed.' : 'Pembersihan telah dijalankan.'}</div>`;
+    } else {
+      itemsListEl.innerHTML = items.map((it) => `
+        <div class="p-2 flex items-center justify-between text-xs font-mono hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40 transition-colors">
+          <div class="flex items-center gap-2 truncate min-w-0 mr-2">
+            <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500 shrink-0"></i>
+            <span class="font-bold text-zinc-800 dark:text-zinc-200 shrink-0">${escapeHtml(it.category || 'Cache')}</span>
+            <span class="text-[10px] text-zinc-400 dark:text-zinc-500 truncate" title="${escapeHtml(it.path)}">${escapeHtml(it.path)}</span>
+          </div>
+          <span class="font-bold text-zinc-700 dark:text-zinc-300 ml-2 shrink-0 tabular-nums">${escapeHtml(it.sizeFormatted || '')}</span>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Warnings / Rejections
+  if (warningsBox && warningsDesc) {
+    const rejected = opts.rejected || [];
+    const errors = opts.errors || [];
+    if (rejected.length > 0 || errors.length > 0) {
+      warningsBox.classList.remove('hidden');
+      const msg = [];
+      if (rejected.length > 0) {
+        msg.push(currentLang === 'en'
+          ? `${rejected.length} protected item(s) skipped by security filter.`
+          : `${rejected.length} item dilindungi dilewati oleh filter pengaman.`);
+      }
+      if (errors.length > 0) {
+        msg.push(currentLang === 'en'
+          ? `${errors.length} item(s) locked or in use.`
+          : `${errors.length} berkas sedang digunakan oleh program lain.`);
+      }
+      warningsDesc.textContent = msg.join(' ');
+    } else {
+      warningsBox.classList.add('hidden');
+    }
+  }
+
+  modal.classList.remove('hidden');
+  document.body.classList.add('overflow-hidden');
+  safeCreateIcons();
+}
+
+function closeCleanupCompleteModal() {
+  const modal = document.getElementById('cleanup-complete-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+  }
 }

@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Version-v3.4.0-emerald.svg?logo=github&logoColor=white" alt="Version v3.4.0"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Version-v0.3.5.0-emerald.svg?logo=github&logoColor=white" alt="Version v0.3.5.0"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
   <a href="#-privacy-guarantee-we-do-not-collect-data"><img src="https://img.shields.io/badge/Privacy-100%25%20UU%20PDP%20Compliant-blue.svg?logo=shield&logoColor=white" alt="UU PDP Compliant"></a>
@@ -48,6 +48,17 @@ A drive can report `Current = 100` while its raw registers show worn NAND cells,
 | **Local-only attack surface** | API token, Host/Origin checks, path allowlists, and body caps on a loopback-only server. |
 | **Measured, not guessed** | Storage categories use bytes actually scanned; the app reports coverage instead of filling the chart with estimates. |
 | **Honest cleanup** | Recommendations are explicit, manual folders stay manual, and protected system paths are rejected server-side. |
+
+---
+
+## v0.3.5.0 Highlights — Interactive Cleanup Progress & Real-Time Storage Reclamation
+
+| Area | v0.3.5.0 Improvement |
+| :--- | :--- |
+| **Interactive Cleanup Progress** | Real-time loading overlay modal and button animation during storage cleanup. Users are clearly informed that safe background deletion is actively executing instead of experiencing an unresponsive UI. |
+| **Instant View Auto-Refresh** | Cleaned cache folders and duplicate copies are immediately removed from the recommendation lists and duplicate tables upon completion. Badge counts and total reclaimable counters update instantly without manual rescan. |
+| **Before-vs-After Reclamation Summary** | Comprehensive post-cleanup dialog displaying exact initial free space, final free space, total reclaimed gigabytes, and an itemized breakdown of successfully purged cache directories. |
+| **Storage Engine Telemetry** | Backend `storage_manager.py` captures atomic `before_stats`, `after_stats`, and `cleaned_paths` directly from Windows OS disk usage APIs with zero telemetry leakage. |
 
 ---
 
@@ -119,15 +130,15 @@ These are reproducible checks, not marketing estimates. Hardware readings vary b
 
 ---
 
-## Download & Install (v3.4.0)
+## Download & Install (v0.3.5.0)
 
 Standalone executables for Windows 10 & 11 (64-bit):
 
 | Distribution Package | Description | Direct Download |
 | :--- | :--- | :--- |
-| **Windows Installer (.EXE)** *(Recommended)* | Automated installation to local AppData, Start Menu and optional desktop shortcut. Runs without installer-time Administrator rights. | [**Download DiagnoseMyDisk_Setup.exe (v3.4.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk_Setup.exe) |
-| **Portable Archive (.ZIP)** | Standalone portable bundle. Extract and run `DiagnoseMyDisk.exe` without installation. | [**Download DiagnoseMyDisk-v3.4.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk-v3.4.0-portable.zip) |
-| **Checksums** | SHA-256 for both release assets. Verify before running. | [**Download SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/SHA256SUMS.txt) |
+| **Windows Installer (.EXE)** *(Recommended)* | Automated installation to local AppData, Start Menu and optional desktop shortcut. Runs without installer-time Administrator rights. | [**Download DiagnoseMyDisk_Setup.exe (v0.3.5.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk_Setup.exe) |
+| **Portable Archive (.ZIP)** | Standalone portable bundle. Extract and run `DiagnoseMyDisk.exe` without installation. | [**Download DiagnoseMyDisk-v0.3.5.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk-v0.3.5.0-portable.zip) |
+| **Checksums** | SHA-256 for both release assets. Verify before running. | [**Download SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/SHA256SUMS.txt) |
 
 ```text
 f31331fd387adae66ba45962741db7822f5a5e796359139f9a34907b9245bc14  DiagnoseMyDisk_Setup.exe
@@ -472,15 +483,15 @@ Drive bisa melaporkan `Current = 100` sementara register mentahnya menunjukkan s
 
 ---
 
-## Unduh & Pasang Sekarang (v3.4.0)
+## Unduh & Pasang Sekarang (v0.3.5.0)
 
 Tersedia versi siap pakai untuk Windows 10 & 11 (64-bit):
 
 | Paket Rilis | Deskripsi | Tautan Unduhan Langsung |
 | :--- | :--- | :--- |
-| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke local AppData, Start Menu, dan shortcut desktop opsional. Tanpa hak Administrator saat instalasi. | [**Unduh DiagnoseMyDisk_Setup.exe (v3.4.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk_Setup.exe) |
-| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v3.4.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk-v3.4.0-portable.zip) |
-| **Checksum** | SHA-256 untuk kedua aset rilis. Verifikasi sebelum menjalankan. | [**Unduh SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/SHA256SUMS.txt) |
+| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke local AppData, Start Menu, dan shortcut desktop opsional. Tanpa hak Administrator saat instalasi. | [**Unduh DiagnoseMyDisk_Setup.exe (v0.3.5.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk_Setup.exe) |
+| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v0.3.5.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk-v0.3.5.0-portable.zip) |
+| **Checksum** | SHA-256 untuk kedua aset rilis. Verifikasi sebelum menjalankan. | [**Unduh SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/SHA256SUMS.txt) |
 
 Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases). Aplikasi memerlukan Windows 10/11 x64 dan membuka jendela Edge/Chrome khusus pada `127.0.0.1:5550`.
 

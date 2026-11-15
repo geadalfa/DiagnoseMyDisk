@@ -32,7 +32,7 @@
   <!-- Offline Native Desktop Assets (Zero External CDN Dependency) -->
   <script src="tailwind.min.js"></script>
   <script src="lucide.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=3.4.0">
+  <link rel="stylesheet" href="style.css?v=0.3.5.0">
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -1441,6 +1441,104 @@
     </div>
   </div>
 
-    <script src="app.js?v=3.4.0"></script>
+  <!-- MODAL: CLEANUP IN PROGRESS (ACTIVE OPERATION) -->
+  <div id="cleanup-progress-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="cleanup-progress-title">
+    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 text-center animate-in fade-in zoom-in-95 duration-150">
+      <div class="w-14 h-14 mx-auto rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400">
+        <i data-lucide="loader-2" class="w-7 h-7 animate-spin"></i>
+      </div>
+      <div class="space-y-1.5">
+        <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100" id="cleanup-progress-title">Sedang Membersihkan Disk...</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400" id="cleanup-progress-desc">Menghapus berkas sementara dan cache aplikasi terpilih secara aman...</p>
+      </div>
+      <div class="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-2.5 overflow-hidden border border-zinc-200 dark:border-zinc-700/80">
+        <div class="progress-shimmer h-full w-full rounded-full"></div>
+      </div>
+      <div class="text-[11px] font-mono text-zinc-400 dark:text-zinc-500" id="cleanup-progress-status">
+        Mohon tunggu sejenak, proses ini tidak menyentuh data pribadi Anda.
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CLEANUP COMPLETED (BEFORE VS AFTER SUMMARY) -->
+  <div id="cleanup-complete-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="cleanup-complete-title">
+    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-850 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="p-2 rounded-lg bg-emerald-600 text-white shadow-xs">
+            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-black text-zinc-900 dark:text-zinc-100 tracking-tight" id="cleanup-complete-title">Pembersihan Selesai!</h3>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400" id="cleanup-complete-subtitle">Ruang penyimpanan disk berhasil dibebaskan dengan aman.</p>
+          </div>
+        </div>
+        <button onclick="closeCleanupCompleteModal()" class="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all cursor-pointer" title="Tutup">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-4 text-xs leading-relaxed">
+        <!-- Before vs After Hero Card -->
+        <div class="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <i data-lucide="hard-drive" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+              <span id="cleanup-target-drive">Drive C:</span>
+            </span>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800" id="cleanup-freed-badge">+0 B Dibebaskan</span>
+          </div>
+
+          <!-- 3-Column Metrics Comparison -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+            <div class="p-2.5 rounded-lg bg-white dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 text-center">
+              <div class="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400" id="lbl-space-before">Ruang Bebas Awal</div>
+              <div class="text-sm font-bold font-mono text-zinc-800 dark:text-zinc-200 mt-0.5 tabular-nums" id="cleanup-space-before">--</div>
+            </div>
+            <div class="p-2.5 rounded-lg bg-white dark:bg-zinc-850 border border-emerald-300 dark:border-emerald-800 text-center ring-1 ring-emerald-500/30">
+              <div class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400" id="lbl-space-after">Ruang Bebas Akhir</div>
+              <div class="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400 mt-0.5 tabular-nums" id="cleanup-space-after">--</div>
+            </div>
+            <div class="col-span-2 sm:col-span-1 p-2.5 rounded-lg bg-white dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 text-center">
+              <div class="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400" id="lbl-items-cleaned">Item Dibersihkan</div>
+              <div class="text-sm font-bold font-mono text-blue-600 dark:text-blue-400 mt-0.5 tabular-nums" id="cleanup-count-summary">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cleaned Items List -->
+        <div class="space-y-2">
+          <h4 class="font-bold text-xs text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+            <span id="lbl-cleaned-items-title">Daftar Item yang Berhasil Dibersihkan:</span>
+            <span class="text-[11px] font-mono text-zinc-500 font-normal" id="cleanup-summary-note"></span>
+          </h4>
+          <div class="max-h-48 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800/60 bg-zinc-50/50 dark:bg-zinc-900/50 p-1" id="cleanup-items-list">
+          </div>
+        </div>
+
+        <!-- Warnings / Rejections Notice if any -->
+        <div id="cleanup-warnings-box" class="hidden p-3 rounded-lg border border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200 text-[11px] space-y-1">
+          <div class="font-bold flex items-center gap-1.5">
+            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
+            <span id="cleanup-warnings-title">Catatan Pengamanan:</span>
+          </div>
+          <p id="cleanup-warnings-desc"></p>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3.5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 flex items-center justify-between shrink-0">
+        <span class="text-[11px] text-zinc-500 dark:text-zinc-400" id="cleanup-footer-tip">Daftar rekomendasi telah diperbarui secara otomatis.</span>
+        <button onclick="closeCleanupCompleteModal()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer">
+          <span id="btn-txt-cleanup-done">Selesai</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+    <script src="app.js?v=0.3.5.0"></script>
 </body>
 </html>

@@ -32,10 +32,13 @@ def parse_version(v_str: str) -> Tuple[int, ...]:
         return (0, 0, 0)
     # Bersihkan prefix 'v' atau whitespace
     cleaned = v_str.strip().lstrip("vV")
-    # Ambil bagian angka numerik utama
-    parts = re.findall(r"\d+", cleaned)
+    # Pisahkan pre-release suffix (misal '-rc1' atau '+build') agar tidak mengambil angka suffix
+    main_ver = cleaned.split("-")[0].split("+")[0]
+    parts = re.findall(r"\d+", main_ver)
     if not parts:
         return (0, 0, 0)
+    if len(parts) >= 4:
+        return tuple(int(p) for p in parts[:4])
     return tuple(int(p) for p in parts[:3])
 
 
@@ -46,10 +49,11 @@ def compare_versions(v1_str: str, v2_str: str) -> int:
     """
     t1 = parse_version(v1_str)
     t2 = parse_version(v2_str)
-    # Samakan panjang tuple menjadi 3 elemen
-    while len(t1) < 3:
+    # Samakan panjang tuple menjadi minimal 3 elemen atau terpanjang
+    max_len = max(len(t1), len(t2), 3)
+    while len(t1) < max_len:
         t1 = t1 + (0,)
-    while len(t2) < 3:
+    while len(t2) < max_len:
         t2 = t2 + (0,)
     if t1 > t2:
         return 1
