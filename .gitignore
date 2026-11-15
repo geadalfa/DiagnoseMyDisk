@@ -23,3 +23,10 @@ ENV/
 .idea/
 Thumbs.db
 Desktop.ini
+.DS_Store
+
+# macOS & XcodeGen
+macos/build/
+macos/DerivedData/
+*.xcodeproj/
+*.xcworkspace/

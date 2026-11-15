@@ -15,11 +15,13 @@
 <p align="center">
   <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Version-v0.3.5.0-emerald.svg?logo=github&logoColor=white" alt="Version v0.3.5.0"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
+  <a href="#macos-edition"><img src="https://img.shields.io/badge/Platform-macOS%2014%2B%20(Apple%20Silicon)-000000.svg?logo=apple&logoColor=white" alt="Platform macOS"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
+  <a href="#macos-edition"><img src="https://img.shields.io/badge/Swift-6.0-F05138.svg?logo=swift&logoColor=white" alt="Swift 6.0"></a>
   <a href="#-privacy-guarantee-we-do-not-collect-data"><img src="https://img.shields.io/badge/Privacy-100%25%20UU%20PDP%20Compliant-blue.svg?logo=shield&logoColor=white" alt="UU PDP Compliant"></a>
   <a href="#-privacy-guarantee-we-do-not-collect-data"><img src="https://img.shields.io/badge/Zero--Telemetry-No%20Data%20Collected-10b981.svg" alt="Zero Telemetry"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-CC%20BY--NC%204.0%20(Non--Commercial)-lightgrey.svg" alt="License: CC BY-NC 4.0"></a>
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/tree/main/tests"><img src="https://img.shields.io/badge/Tests-85%20passing-10b981.svg" alt="85 tests passing"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/tree/main/tests"><img src="https://img.shields.io/badge/Tests-Passing%20(Win%20%2B%20macOS)-10b981.svg" alt="Tests passing"></a>
   <a href="#security-model-v300"><img src="https://img.shields.io/badge/API-127.0.0.1%20only-2563EB.svg" alt="Local API only"></a>
 </p>
 
@@ -132,20 +134,22 @@ These are reproducible checks, not marketing estimates. Hardware readings vary b
 
 ## Download & Install (v0.3.5.0)
 
-Standalone executables for Windows 10 & 11 (64-bit):
+Official release packages for Windows 10 & 11 (64-bit) and macOS 14.0+ (Apple Silicon):
 
 | Distribution Package | Description | Direct Download |
 | :--- | :--- | :--- |
+| **macOS Installer (.DMG)** *(Apple Silicon)* | Native Apple Silicon macOS application (`.app`) inside a compressed `UDZO` disk image. Drag-and-drop directly into Applications. | [**Download DiagnoseMyDisk.dmg (v0.3.5.0)**](releases/DiagnoseMyDisk.dmg) |
 | **Windows Installer (.EXE)** *(Recommended)* | Automated installation to local AppData, Start Menu and optional desktop shortcut. Runs without installer-time Administrator rights. | [**Download DiagnoseMyDisk_Setup.exe (v0.3.5.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk_Setup.exe) |
-| **Portable Archive (.ZIP)** | Standalone portable bundle. Extract and run `DiagnoseMyDisk.exe` without installation. | [**Download DiagnoseMyDisk-v0.3.5.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk-v0.3.5.0-portable.zip) |
-| **Checksums** | SHA-256 for both release assets. Verify before running. | [**Download SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/SHA256SUMS.txt) |
+| **Portable Archive (.ZIP)** | Standalone portable bundle for Windows. Extract and run `DiagnoseMyDisk.exe` without installation. | [**Download DiagnoseMyDisk-v0.3.5.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk-v0.3.5.0-portable.zip) |
+| **Checksums** | SHA-256 for release assets. Verify before running. | [**Download SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/SHA256SUMS.txt) |
 
 ```text
+870c69fcb044ab45de9a8d4e112dc86f90d11f7978f7c5c70b56bca0b899d134  DiagnoseMyDisk.dmg
 f31331fd387adae66ba45962741db7822f5a5e796359139f9a34907b9245bc14  DiagnoseMyDisk_Setup.exe
 5c338448fa159294fd6399abb854f2edee5a56691a96e38bf951f5162c83ecbf  DiagnoseMyDisk-v3.2.0-portable.zip
 ```
 
-All official releases and commit histories are accessible on [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases). The application requires Windows 10/11 x64 and opens in a dedicated Edge/Chrome app window on `127.0.0.1:5550`.
+All official releases and commit histories are accessible on [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases). On Windows, the application requires Windows 10/11 x64 and opens in a dedicated Edge/Chrome app window on `127.0.0.1:5550`. On macOS, it runs as a native SwiftUI 6 / AppKit desktop application on Apple Silicon.
 
 ---
 
@@ -294,6 +298,14 @@ DiagnoseMyDisk/
 │   ├── test_health_engine.py # Health engine honesty tests (unknown states, no invented telemetry)
 │   ├── test_performance.py   # Scan/API performance guardrails
 │   └── test_storage_manager.py # Storage engine, measured summaries, allowlists & folder inspector
+├── macos/                    # Native macOS Application (Swift 6 & SwiftUI)
+│   ├── Sources/              # App entrypoint, models, services & HIG views
+│   ├── Resources/            # Hardened entitlements & AppIcon asset catalog
+│   ├── Tests/                # Comprehensive unit test suite (11/11 passing)
+│   ├── scripts/              # Static anti-slop linter & UDZO DMG packager
+│   ├── project.yml           # Declarative XcodeGen project specification
+│   └── docs/SPEC.md          # macOS architecture contract & HIG thesis
+├── releases/                 # Release binaries (.dmg)
 ├── app_icon.ico              # Windows PE executable icon
 ├── DiagnoseMyDisk.spec       # PyInstaller build specification (Clean standalone bundle)
 ├── installer.iss             # Inno Setup Windows installer script (v3.1.0)
@@ -309,7 +321,25 @@ DiagnoseMyDisk/
 
 ## Development & Build Instructions
 
-### 1. Running from Source
+### 1. Building Native macOS Edition (.APP & .DMG)
+
+Prerequisites: macOS 14.0+, Xcode 15+, Apple Silicon (arm64), XcodeGen, create-dmg:
+
+```bash
+# 1. Clone repository
+git clone https://github.com/geadalfa/DiagnoseMyDisk.git
+cd DiagnoseMyDisk/macos
+
+# 2. Run anti-slop audit and compile compressed UDZO .dmg installer
+bash scripts/build-dmg.sh . "DiagnoseMyDisk"
+
+# 3. Run automated test suite (11/11 passing)
+xcodegen generate
+xcodebuild test -project DiagnoseMyDisk.xcodeproj -scheme DiagnoseMyDisk -destination "platform=macOS,arch=arm64"
+```
+*The compiled application is generated at `macos/build/Export/DiagnoseMyDisk.app` and packaged into `macos/build/DiagnoseMyDisk.dmg` (also mirrored in `releases/DiagnoseMyDisk.dmg`).*
+
+### 2. Running Windows Version from Source
 
 Prerequisites: Python 3.9+ on Windows:
 
@@ -327,7 +357,7 @@ python server.py
 ```
 *The native application window opens automatically via Microsoft Edge in application mode.*
 
-### 2. Compiling Standalone Binary (.EXE)
+### 3. Compiling Windows Standalone Binary (.EXE)
 
 To bundle the application into a standalone folder distribution using **PyInstaller**:
 
@@ -336,7 +366,7 @@ pyinstaller -y --clean DiagnoseMyDisk.spec
 ```
 *The compiled binary is generated at `dist/DiagnoseMyDisk/DiagnoseMyDisk.exe`.*
 
-### 3. Building Windows Setup Installer (.EXE)
+### 4. Building Windows Setup Installer (.EXE)
 
 To compile the setup installer with **Inno Setup 6**:
 
@@ -345,7 +375,7 @@ iscc installer.iss
 ```
 *The installer package `DiagnoseMyDisk_Setup.exe` is placed in `installer_output/`.*
 
-### 4. Running Unit & Integration Tests (QA Verification)
+### 5. Running Windows Unit & Integration Tests (QA Verification)
 
 ```powershell
 python -m unittest discover tests
@@ -485,15 +515,22 @@ Drive bisa melaporkan `Current = 100` sementara register mentahnya menunjukkan s
 
 ## Unduh & Pasang Sekarang (v0.3.5.0)
 
-Tersedia versi siap pakai untuk Windows 10 & 11 (64-bit):
+Tersedia versi siap pakai untuk Windows 10 & 11 (64-bit) dan macOS 14.0+ (Apple Silicon):
 
 | Paket Rilis | Deskripsi | Tautan Unduhan Langsung |
 | :--- | :--- | :--- |
+| **macOS Installer (.DMG)** *(Apple Silicon)* | Aplikasi native macOS (`.app`) dalam format disk image `UDZO` terkompresi. Cukup drag-and-drop ke folder Applications. | [**Unduh DiagnoseMyDisk.dmg (v0.3.5.0)**](releases/DiagnoseMyDisk.dmg) |
 | **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke local AppData, Start Menu, dan shortcut desktop opsional. Tanpa hak Administrator saat instalasi. | [**Unduh DiagnoseMyDisk_Setup.exe (v0.3.5.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk_Setup.exe) |
-| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v0.3.5.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk-v0.3.5.0-portable.zip) |
-| **Checksum** | SHA-256 untuk kedua aset rilis. Verifikasi sebelum menjalankan. | [**Unduh SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/SHA256SUMS.txt) |
+| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi untuk Windows. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v0.3.5.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/DiagnoseMyDisk-v0.3.5.0-portable.zip) |
+| **Checksum** | SHA-256 untuk aset rilis. Verifikasi integritas sebelum menjalankan. | [**Unduh SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v0.3.5.0/SHA256SUMS.txt) |
 
-Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases). Aplikasi memerlukan Windows 10/11 x64 dan membuka jendela Edge/Chrome khusus pada `127.0.0.1:5550`.
+```text
+870c69fcb044ab45de9a8d4e112dc86f90d11f7978f7c5c70b56bca0b899d134  DiagnoseMyDisk.dmg
+f31331fd387adae66ba45962741db7822f5a5e796359139f9a34907b9245bc14  DiagnoseMyDisk_Setup.exe
+5c338448fa159294fd6399abb854f2edee5a56691a96e38bf951f5162c83ecbf  DiagnoseMyDisk-v3.2.0-portable.zip
+```
+
+Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases). Di Windows, aplikasi memerlukan Windows 10/11 x64 dan membuka jendela Edge/Chrome khusus pada `127.0.0.1:5550`. Di macOS, aplikasi berjalan sebagai native SwiftUI 6 / AppKit desktop application pada Apple Silicon.
 
 ---
 
@@ -614,7 +651,24 @@ Sebagai bukti konkret pentingnya algoritma **True Health**, perhatikan perbedaan
 
 ## Panduan Menjalankan & Build
 
-### 1. Menjalankan Langsung dari Source Code (Development)
+### 1. Membangun Edisi Native macOS (.APP & .DMG)
+
+Prasyarat: macOS 14.0+, Xcode 15+, Apple Silicon (arm64), XcodeGen, create-dmg:
+
+```bash
+# 1. Masuk ke direktori macos
+cd macos
+
+# 2. Jalankan audit anti-slop dan kompilasi installer .dmg UDZO terkompresi
+bash scripts/build-dmg.sh . "DiagnoseMyDisk"
+
+# 3. Jalankan suite pengujian unit otomatis (11/11 lulus)
+xcodegen generate
+xcodebuild test -project DiagnoseMyDisk.xcodeproj -scheme DiagnoseMyDisk -destination "platform=macOS,arch=arm64"
+```
+*Hasil build aplikasi berada di `macos/build/Export/DiagnoseMyDisk.app` dan paket installer `macos/build/DiagnoseMyDisk.dmg` (juga tersedia di `releases/DiagnoseMyDisk.dmg`).*
+
+### 2. Menjalankan Versi Windows Langsung dari Source Code (Development)
 
 Pastikan Python 3.9+ telah terpasang di sistem Windows Anda:
 
@@ -632,7 +686,7 @@ python server.py
 ```
 *Jendela aplikasi native desktop akan terbuka secara otomatis.*
 
-### 2. Melakukan Kompilasi Biner Executable (.EXE)
+### 3. Melakukan Kompilasi Biner Executable Windows (.EXE)
 
 Aplikasi dapat dikompilasi menjadi satu folder aplikasi mandiri (*standalone onedir*) menggunakan **PyInstaller**:
 
@@ -641,7 +695,7 @@ pyinstaller -y --clean DiagnoseMyDisk.spec
 ```
 *Hasil build executable akan berada di direktori `dist/DiagnoseMyDisk/DiagnoseMyDisk.exe`.*
 
-### 3. Membuat File Installer Setup Windows (.EXE)
+### 4. Membuat File Installer Setup Windows (.EXE)
 
 Jika Anda memiliki **Inno Setup 6**, Anda dapat membuat file installer profesional:
 
@@ -651,7 +705,7 @@ iscc installer.iss
 ```
 *File installer setup mandiri `DiagnoseMyDisk_Setup.exe` akan tersimpan di direktori `installer_output/`.*
 
-### 4. Menjalankan Unit & Integration Tests (QA Standard)
+### 5. Menjalankan Unit & Integration Tests Windows (QA Standard)
 
 ```powershell
 python -m unittest discover tests
