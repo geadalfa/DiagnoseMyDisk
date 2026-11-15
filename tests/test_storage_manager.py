@@ -299,6 +299,17 @@ class TestCleanupRecommendationDriveScoping(unittest.TestCase):
         self.assertEqual(clean_result["deleted_count"], 0)
         self.assertEqual(len(clean_result["rejected"]), 1)
 
+    def test_unavailable_drive_target_fails_honestly(self):
+        # Specifying an unavailable drive (e.g. Z:) must report an error, not scan another drive
+        self.mgr._run_scan_worker(
+            ["Z:"],
+            scan_duplicates=False,
+            min_large_mb=50,
+        )
+        self.assertEqual(self.mgr.status_code, "error")
+        self.assertIn("tidak ditemukan atau tidak tersedia", self.mgr.status_text)
+        self.assertFalse(self.mgr.is_scanning)
+
 
 if __name__ == "__main__":
     unittest.main()

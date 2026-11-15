@@ -115,6 +115,17 @@ class TestHddHealth(unittest.TestCase):
         self.assertIsNone(result["true_health"])
         self.assertEqual(result["status_label_en"], "Unknown")
 
+    def test_hdd_without_sector_attributes_is_unknown_na(self):
+        # Attributes without 0x05, 0xC5, or 0xC6 must not fabricate 100% health
+        attrs = make_attrs([(0x09, 100, 5000), (0xC2, 100, 35)])
+        result = calculate_hdd_health(attrs, power_on_hours=5000, temperature=35)
+        self.assertIsNone(result["true_health"])
+        self.assertEqual(result["status_label_en"], "Unknown")
+        self.assertIn("sector health attributes (0x05, 0xC5, 0xC6)", result["data_gaps"])
+        factor_titles = [f["title_en"] for f in result["layman_factors"]]
+        self.assertNotIn("Clean Platter Surface", factor_titles)
+        self.assertIn("Sector Telemetry Not Available", factor_titles)
+
 
 class TestSmartIniParsing(unittest.TestCase):
     def _write_ini(self, content):

@@ -3,7 +3,7 @@
 ; Produces a standalone installer at installer_output\DiagnoseMyDisk_Setup.exe
 
 #define MyAppName "DiagnoseMyDisk"
-#define MyAppVersion "3.3.0"
+#define MyAppVersion "3.4.0"
 #define MyAppPublisher "Alfa & Gemi"
 #define MyAppExeName "DiagnoseMyDisk.exe"
 #define MyAppURL "https://github.com/geadalfa/DiagnoseMyDisk"

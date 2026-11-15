@@ -228,6 +228,16 @@ class TestServerRoutesIntegration(unittest.TestCase):
         self.assertTrue(data.get("success"))
         self.assertLessEqual(len(data.get("blocks", [])), 64)
 
+    def test_api_history_and_clear(self):
+        # 1. Fetch history
+        res = self._get_json("/api/history")
+        self.assertTrue(res.get("success"))
+        self.assertIn("history", res)
+
+        # 2. Clear history
+        clear_res = self._post_json("/api/history/clear", {})
+        self.assertTrue(clear_res.get("success"))
+
 
 if __name__ == "__main__":
     unittest.main()

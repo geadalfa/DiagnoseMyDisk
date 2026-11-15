@@ -241,7 +241,14 @@ def check_dirty_bit(drive_letter):
             timeout=5,
             creationflags=0x08000000 if os.name == "nt" else 0,
         )
-        out = p.stdout.strip()
+        out = (p.stdout or "").strip()
+        err = (p.stderr or "").strip()
+        if p.returncode != 0:
+            return {
+                "success": False,
+                "drive": f"{clean_letter}:",
+                "error": err or out or f"fsutil returned exit code {p.returncode}",
+            }
         is_dirty = "is dirty" in out.lower()
         return {
             "success": True,
@@ -271,18 +278,22 @@ def repair_filesystem(drive_letter):
             creationflags=0x08000000 if os.name == "nt" else 0,
         )
         out = (p.stdout + "\n" + p.stderr).strip()
-        return {
-            "success": p.returncode == 0,
+        success = p.returncode == 0
+        res = {
+            "success": success,
             "drive": f"{clean_letter}:",
             "command": cmd,
-            "output": out or "Pemeriksaan sistem file selesai. Tidak ditemukan kerusakan struktur direktori.",
+            "output": out or ("Pemeriksaan sistem file selesai. Tidak ditemukan kerusakan struktur direktori." if success else "Pemeriksaan sistem file gagal."),
         }
+        if not success:
+            res["error"] = f"Repair-Volume gagal dengan exit code {p.returncode}: {out}"
+        return res
     except subprocess.TimeoutExpired:
         return {
-            "success": True,
+            "success": False,
             "drive": f"{clean_letter}:",
             "command": cmd,
-            "output": "Pemeriksaan sedang berjalan di latar belakang Windows. Silakan pantau Event Viewer sistem.",
+            "error": "Pemeriksaan sistem file melebihi batas waktu (timeout 60 detik). Silakan periksa status volume di Event Viewer Windows.",
         }
     except Exception as e:
         return {"success": False, "drive": f"{clean_letter}:", "error": str(e)}

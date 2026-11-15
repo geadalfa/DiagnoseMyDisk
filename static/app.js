@@ -148,6 +148,24 @@ const I18N = {
     updateNow: 'Perbarui Sekarang',
     installRestart: 'Pasang & Mulai Ulang',
     updateInstalling: 'Menjalankan installer...',
+    navHelp: 'Bantuan & Panduan',
+    actionsTitle: 'Apa yang Perlu Dilakukan?',
+    actionsSubtitle: 'Langkah kontekstual berdasarkan telemetri fisik disk Anda saat ini',
+    historyTitle: 'Riwayat & Tren Kesehatan Disk',
+    historySubtitle: 'Snapshot lokal terukur (maksimal 30 titik) tanpa spekulasi umur disk',
+    btnClearHistory: 'Hapus Riwayat',
+    confirmClearHistory: 'Apakah Anda yakin ingin menghapus seluruh riwayat kesehatan disk ini?',
+    onboardingTitle: 'Selamat Datang di DiagnoseMyDisk',
+    onboardingSubtitle: 'Diagnosa kesehatan disk terpercaya, 100% lokal, tanpa fabrikasi telemetri.',
+    onboardingP1Title: '100% Offline & Privasi Terjamin',
+    onboardingP1Desc: 'Aplikasi membaca telemetri hardware langsung dari register CIM WMI & controller disk Anda. Nol byte data, berkas, atau informasi pribadi yang dikirim ke internet.',
+    onboardingP2Title: 'Kesehatan Sebenarnya (True Health)',
+    onboardingP2Desc: 'Menyingkap trik firmware produsen yang mengunci kesehatan di 100% saat drive mengalami keausan sektor. Data kesehatan yang ditampilkan selalu berlandaskan bukti fisik nyata.',
+    onboardingP3Title: 'Diagnosa Aman vs Perbaikan Terarah',
+    onboardingP3Desc: 'Seluruh pemindaian awal (Summary, S.M.A.R.T, dan Analisis Penyimpanan) adalah 100% Read-Only (Aman). Operasi perbaikan (TRIM, CHKDSK) atau pembersihan storage wajib melalui konfirmasi eksplisit Anda.',
+    onboardingCta: 'Lihat Kesehatan Disk',
+    onboardingFooterTip: 'Buka kembali panduan ini kapan saja melalui menu Bantuan & Panduan di sidebar.',
+    lblOnboardingLang: 'Pilih Bahasa Tampilan / Language:',
   },
   en: {
     appSubtitle: 'True Health Verification, Bad Sector Scan & S.M.A.R.T Telemetry',
@@ -242,6 +260,24 @@ const I18N = {
     flashArchTitle: 'Flash Architecture & Hardware Features',
     flashArchSubtitle: 'Memory cell technology (TLC/QLC/SLC), DRAM/HMB caching, and hardware controller specs',
     btnGlossary: 'QLC/TLC Educational Guide',
+    navHelp: 'Help & Guide',
+    actionsTitle: 'Recommended Actions',
+    actionsSubtitle: 'Contextual actions based on your current physical hardware telemetry',
+    historyTitle: 'Health History & Trend',
+    historySubtitle: 'Measured local snapshots (max 30 points) without lifespan speculation',
+    btnClearHistory: 'Clear History',
+    confirmClearHistory: 'Are you sure you want to clear the health history for this disk?',
+    onboardingTitle: 'Welcome to DiagnoseMyDisk',
+    onboardingSubtitle: 'Trustworthy disk health diagnostics, 100% local, zero telemetry fabrication.',
+    onboardingP1Title: '100% Offline & Privacy Guaranteed',
+    onboardingP1Desc: 'Reads hardware telemetry directly from CIM WMI & controller registers. Zero bytes of personal files or telemetry uploaded.',
+    onboardingP2Title: 'True Health & Unmasked Firmware',
+    onboardingP2Desc: 'Unmasks manufacturer firmware locks reporting 100% health during physical sector wear. Evaluated strictly from genuine telemetry evidence.',
+    onboardingP3Title: 'Safe Diagnostics vs Guarded Repairs',
+    onboardingP3Desc: 'Initial scans (Summary, S.M.A.R.T, Storage Analysis) are 100% Read-Only (Safe). Repair operations (TRIM, CHKDSK) or cleanup require explicit confirmation.',
+    onboardingCta: 'View Disk Health',
+    onboardingFooterTip: 'Reopen this guide anytime via Help & Guide in the sidebar.',
+    lblOnboardingLang: 'Select Display Language / Bahasa:',
     lblHwNand: 'Flash Cell Type',
     lblHwCache: 'Cache Architecture',
     lblHwSlc: 'Write Acceleration',
@@ -599,9 +635,14 @@ function initApp() {
   const shouldUseDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
   enableDarkTheme(shouldUseDark);
 
-  // 1. Initial fast boot: check localStorage synchronously, default strictly to English 'en'
+  // 1. Initial fast boot: check localStorage synchronously, default to browser locale or 'en'
   const localLang = localStorage.getItem('diagnose_lang');
-  const initialLang = (localLang === 'id' || localLang === 'en') ? localLang : 'en';
+  let initialLang = 'en';
+  if (localLang === 'id' || localLang === 'en') {
+    initialLang = localLang;
+  } else if (typeof navigator !== 'undefined' && navigator.language && navigator.language.toLowerCase().startsWith('id')) {
+    initialLang = 'id';
+  }
   setLanguage(initialLang, false);
 
   // 2. Background sync: synchronize with durable server-side profile preferences
@@ -610,6 +651,18 @@ function initApp() {
   initSurfaceGrid();
   startHeartbeat();
   fetchDisksData();
+
+  // 3. First-run onboarding check
+  try {
+    const hasOnboarded = localStorage.getItem('diagnose_onboarded');
+    if (!hasOnboarded) {
+      setTimeout(() => {
+        openOnboardingModal(false);
+      }, 350);
+    }
+  } catch (e) {
+    console.warn('Onboarding check notice:', e);
+  }
 }
 
 // Heartbeat & lifecycle: memastikan server backend otomatis berhenti saat jendela desktop ditutup
@@ -725,6 +778,53 @@ function setLanguage(lang, triggerRender = true) {
     const el = document.getElementById(id);
     if (el) el.textContent = txt(labels[0], labels[1]);
   });
+  const txtHelp = document.getElementById('txt-help-guide');
+  if (txtHelp) txtHelp.textContent = t.navHelp || (currentLang === 'en' ? 'Help & Guide' : 'Bantuan & Panduan');
+  const txtActTitle = document.getElementById('txt-actions-title');
+  if (txtActTitle) txtActTitle.textContent = t.actionsTitle || (currentLang === 'en' ? 'Recommended Actions' : 'Apa yang Perlu Dilakukan?');
+  const txtActSub = document.getElementById('txt-actions-subtitle');
+  if (txtActSub) txtActSub.textContent = t.actionsSubtitle || (currentLang === 'en' ? 'Contextual actions based on your current physical hardware telemetry' : 'Langkah kontekstual berdasarkan telemetri fisik disk Anda saat ini');
+  const txtHistTitle = document.getElementById('txt-history-title');
+  if (txtHistTitle) txtHistTitle.textContent = t.historyTitle || (currentLang === 'en' ? 'Health History & Trend' : 'Riwayat & Tren Kesehatan Disk');
+  const txtHistSub = document.getElementById('txt-history-subtitle');
+  if (txtHistSub) txtHistSub.textContent = t.historySubtitle || (currentLang === 'en' ? 'Measured local snapshots (max 30 points) without lifespan speculation' : 'Snapshot lokal terukur (maksimal 30 titik) tanpa spekulasi umur disk');
+  const txtBtnClearHist = document.getElementById('txt-btn-clear-history');
+  if (txtBtnClearHist) txtBtnClearHist.textContent = t.btnClearHistory || (currentLang === 'en' ? 'Clear History' : 'Hapus Riwayat');
+
+  // Onboarding modal elements
+  const onbTitle = document.getElementById('onboarding-title');
+  if (onbTitle) onbTitle.textContent = t.onboardingTitle;
+  const onbSub = document.getElementById('onboarding-subtitle');
+  if (onbSub) onbSub.textContent = t.onboardingSubtitle;
+  const onbLangLbl = document.getElementById('lbl-onboarding-lang');
+  if (onbLangLbl) onbLangLbl.textContent = t.lblOnboardingLang;
+  const onbP1Title = document.getElementById('onboarding-p1-title');
+  if (onbP1Title) onbP1Title.textContent = t.onboardingP1Title;
+  const onbP1Desc = document.getElementById('onboarding-p1-desc');
+  if (onbP1Desc) onbP1Desc.textContent = t.onboardingP1Desc;
+  const onbP2Title = document.getElementById('onboarding-p2-title');
+  if (onbP2Title) onbP2Title.textContent = t.onboardingP2Title;
+  const onbP2Desc = document.getElementById('onboarding-p2-desc');
+  if (onbP2Desc) onbP2Desc.textContent = t.onboardingP2Desc;
+  const onbP3Title = document.getElementById('onboarding-p3-title');
+  if (onbP3Title) onbP3Title.textContent = t.onboardingP3Title;
+  const onbP3Desc = document.getElementById('onboarding-p3-desc');
+  if (onbP3Desc) onbP3Desc.textContent = t.onboardingP3Desc;
+  const onbCta = document.getElementById('txt-onboarding-cta');
+  if (onbCta) onbCta.textContent = t.onboardingCta;
+  const onbTip = document.getElementById('onboarding-footer-tip');
+  if (onbTip) onbTip.textContent = t.onboardingFooterTip;
+
+  const btnOnbId = document.getElementById('btn-onboarding-lang-id');
+  const btnOnbEn = document.getElementById('btn-onboarding-lang-en');
+  if (btnOnbId) btnOnbId.classList.toggle('is-active', currentLang === 'id');
+  if (btnOnbEn) btnOnbEn.classList.toggle('is-active', currentLang === 'en');
+
+  if (allDisks && allDisks.length > 0 && allDisks[activeDiskIndex]) {
+    renderActionRecommendations(allDisks[activeDiskIndex]);
+    renderHealthHistory(allDisks[activeDiskIndex]);
+  }
+
   document.getElementById('txt-masking-title').textContent = t.maskingTitle;
   document.getElementById('txt-masking-badge').textContent = t.maskingBadge;
   document.getElementById('txt-health-status-header').textContent = t.healthStatusHeader;
@@ -1674,6 +1774,8 @@ function renderActiveDisk() {
 
 // Render Konten Mode Ringkasan (Layman)
 function renderLaymanView(ha, disk) {
+  renderActionRecommendations(disk);
+  renderHealthHistory(disk);
   const factorsContainer = document.getElementById('layman-factors-list');
   const tipsContainer = document.getElementById('layman-tips-list');
   const t = I18N[currentLang];
@@ -3349,10 +3451,12 @@ function exportDiagnosticReport() {
       <tr><td>${escapeHtml(a.id_hex || '')}</td><td>${escapeHtml(a.name || '')}</td>
       <td>${a.current ?? '--'}</td><td>${a.worst ?? '--'}</td><td>${a.threshold ?? '--'}</td>
       <td>${a.raw_int ?? '--'}</td></tr>`).join('');
+    const trend = disk.health_trend || {};
+    const trendText = currentLang === 'en' ? (trend.diff_text_en || 'No history') : (trend.diff_text_id || 'Belum ada riwayat');
     return `
       <section>
         <h2>${escapeHtml(disk.name)} <small>${escapeHtml(disk.drive_letters_str || '-')}</small></h2>
-        <p><b>Health:</b> ${health === null ? 'N/A' : `${health}%`} · <b>Source:</b> ${escapeHtml(sourceLabel(disk))}</p>
+        <p><b>Health:</b> ${health === null ? 'N/A' : `${health}%`} · <b>Trend:</b> ${escapeHtml(trendText)} · <b>Source:</b> ${escapeHtml(sourceLabel(disk))}</p>
         <p><b>Interface:</b> ${escapeHtml(disk.bus_type || 'N/A')} · <b>Media:</b> ${escapeHtml(disk.media_type || 'N/A')} · <b>Size:</b> ${disk.size_gb ? `${disk.size_gb} GB` : 'N/A'} · <b>Temperature:</b> ${disk.temperature_c ?? 'N/A'} °C · <b>Power-On:</b> ${disk.power_on_hours ?? 'N/A'} h</p>
         <p><b>Data gaps:</b> ${gaps.length ? escapeHtml(gaps.join(', ')) : 'none reported'}</p>
         <p><b>Factors:</b> ${factors.length ? escapeHtml(factors.join(' · ')) : '—'}</p>
@@ -3377,7 +3481,7 @@ function exportDiagnosticReport() {
       footer{margin-top:32px;color:#71717a;font-size:12px}
     </style></head><body>
     <h1>DiagnoseMyDisk Diagnostic Report</h1>
-    <p>Generated ${new Date().toLocaleString()} · App version 3.0.0 · Local-only, zero telemetry</p>
+    <p>Generated ${new Date().toLocaleString()} · App version 3.4.0 · Local-only, zero telemetry</p>
     ${diskSections}
     ${storageSection}
     <footer>Every unavailable field is reported as N/A or listed as a data gap. This report was generated locally and was not uploaded anywhere.</footer>
@@ -3716,4 +3820,263 @@ function renderFolderFileList(container, data) {
 
   container.innerHTML = html;
   safeCreateIcons();
+}
+
+// ==============================================================================
+// ACTION RECOMMENDATIONS CONTROLLER ("APA YANG PERLU DILAKUKAN?")
+// ==============================================================================
+function renderActionRecommendations(disk) {
+  const container = document.getElementById('action-cards-grid');
+  if (!container) return;
+  if (!disk) {
+    container.innerHTML = '';
+    return;
+  }
+  const ha = disk.health_analysis || {};
+  const health = healthValue(ha);
+  const isMasking = ha.is_masking || false;
+  const factors = ha.layman_factors || [];
+  const hasDanger = factors.some(f => f.severity === 'danger');
+  const hasWarning = factors.some(f => f.severity === 'warning');
+  const isHdd = (disk.media_type || '').toLowerCase().includes('hdd') || (disk.bus_type || '').toLowerCase().includes('ata');
+
+  const actions = [];
+
+  // Action 1: Backup / Safety Recommendation
+  if ((health !== null && health < 80) || hasDanger || isMasking) {
+    actions.push({
+      badge: currentLang === 'en' ? 'HIGH PRIORITY' : 'PRIORITAS TINGGI',
+      badgeClass: 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+      cardClass: 'action-card--danger',
+      icon: 'shield-alert',
+      iconClass: 'text-rose-600 dark:text-rose-400',
+      title: currentLang === 'en' ? 'Back Up Critical Files Immediately' : 'Cadangkan Berkas Penting Segera',
+      desc: currentLang === 'en' 
+        ? 'Drive shows physical wear or telemetry anomaly. Safeguard valuable documents to another physical drive or secure backup.'
+        : 'Drive menunjukkan keausan fisik atau anomali firmware. Segera amankan dokumen berharga ke media penyimpanan lain.',
+      btnText: currentLang === 'en' ? 'View S.M.A.R.T Evidence' : 'Lihat Bukti S.M.A.R.T',
+      onClick: "setMode('tech')"
+    });
+  } else {
+    actions.push({
+      badge: currentLang === 'en' ? 'DATA PROTECTION' : 'PROTEKSI DATA',
+      badgeClass: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+      cardClass: 'action-card--success',
+      icon: 'shield-check',
+      iconClass: 'text-emerald-600 dark:text-emerald-400',
+      title: currentLang === 'en' ? 'Condition Stable — Keep Regular Backups' : 'Kondisi Stabil — Pertahankan Cadangan',
+      desc: currentLang === 'en'
+        ? 'No acute telemetry faults detected. Maintain standard 3-2-1 backup hygiene for essential projects and personal files.'
+        : 'Tidak ada kerusakan telemetri akut. Tetap pertahankan pencadangan berkala (aturan 3-2-1) untuk data penting Anda.',
+      btnText: currentLang === 'en' ? 'Export Diagnostic Report' : 'Ekspor Laporan Diagnostik',
+      onClick: "exportDiagnosticReport()"
+    });
+  }
+
+  // Action 2: Forensic S.M.A.R.T Evidence Inspection
+  actions.push({
+    badge: currentLang === 'en' ? 'TELEMETRY PROOF' : 'BUKTI FORENSIK',
+    badgeClass: 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    cardClass: 'action-card--info',
+    icon: 'table-2',
+    iconClass: 'text-blue-600 dark:text-blue-400',
+    title: currentLang === 'en' ? 'Inspect S.M.A.R.T Forensic Telemetry' : 'Periksa Telemetri Forensik S.M.A.R.T',
+    desc: currentLang === 'en'
+      ? 'Verify raw controller registers (Hex/Dec), spare blocks, wear leveling indices, and manufacturer threshold limits.'
+      : 'Verifikasi register controller mentah (Hex/Dec), blok cadangan, indeks wear leveling, dan batas ambang pabrikan.',
+    btnText: currentLang === 'en' ? 'Open Forensic Table' : 'Buka Tabel Forensik',
+    onClick: "setMode('tech')"
+  });
+
+  // Action 3: Deep Surface Benchmark or Storage Cleanup
+  if (isHdd || hasWarning) {
+    actions.push({
+      badge: currentLang === 'en' ? 'SECTOR SCAN' : 'UJI SEKTOR',
+      badgeClass: 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+      cardClass: 'action-card',
+      icon: 'scan-line',
+      iconClass: 'text-amber-600 dark:text-amber-400',
+      title: currentLang === 'en' ? 'Run Surface Latency Scan' : 'Jalankan Surface Scan Non-Destruktif',
+      desc: currentLang === 'en'
+        ? 'Benchmark 200 block sectors to discover latent read bottlenecks, pending bad sectors, or mechanical delays.'
+        : 'Uji 200 blok sektor untuk mengidentifikasi hambatan latensi baca atau bad sector tersembunyi secara aman.',
+      btnText: currentLang === 'en' ? 'Open Scanner' : 'Buka Scanner',
+      onClick: "setMode('scanner')"
+    });
+  } else {
+    actions.push({
+      badge: currentLang === 'en' ? 'STORAGE HEALTH' : 'ANALISIS RUANG',
+      badgeClass: 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+      cardClass: 'action-card',
+      icon: 'hard-drive-download',
+      iconClass: 'text-purple-600 dark:text-purple-400',
+      title: currentLang === 'en' ? 'Analyze Space & Clean Caches' : 'Analisis Ruang & Bersihkan Cache',
+      desc: currentLang === 'en'
+        ? 'Inspect partition occupancy, duplicate files, and safe developer/system caches to preserve NAND flash wear leveling.'
+        : 'Periksa penggunaan kapasitas, berkas duplikat, dan cache aman demi menjaga ruang kosong wear leveling flash NAND.',
+      btnText: currentLang === 'en' ? 'Analyze Storage' : 'Analisis Penyimpanan',
+      onClick: "setMode('storage')"
+    });
+  }
+
+  container.innerHTML = actions.map(act => `
+    <div class="action-card ${act.cardClass} space-y-3">
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${act.badgeClass}">${act.badge}</span>
+          <i data-lucide="${act.icon}" class="w-4 h-4 ${act.iconClass}"></i>
+        </div>
+        <h4 class="font-bold text-xs text-zinc-900 dark:text-zinc-100">${escapeHtml(act.title)}</h4>
+        <p class="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">${escapeHtml(act.desc)}</p>
+      </div>
+      <button onclick="${act.onClick}" class="w-full mt-auto py-1.5 px-3 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+        <span>${escapeHtml(act.btnText)}</span>
+        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+  `).join('');
+}
+
+// ==============================================================================
+// LOCAL HEALTH HISTORY CONTROLLER
+// ==============================================================================
+function renderHealthHistory(disk) {
+  const container = document.getElementById('history-snapshots-container');
+  const badgeTrend = document.getElementById('badge-history-trend');
+  if (!container || !badgeTrend) return;
+  if (!disk) {
+    container.innerHTML = '';
+    badgeTrend.textContent = '--';
+    return;
+  }
+
+  const trend = disk.health_trend || {};
+  const snapshots = trend.snapshots || [];
+
+  if (badgeTrend) {
+    const diffText = currentLang === 'en' ? (trend.diff_text_en || 'No history') : (trend.diff_text_id || 'Belum ada riwayat');
+    badgeTrend.textContent = diffText;
+    badgeTrend.className = 'px-2 py-0.5 rounded text-[11px] font-mono font-bold border';
+    if (trend.trend_status === 'degraded') {
+      badgeTrend.classList.add('bg-rose-50', 'dark:bg-rose-950/50', 'text-rose-700', 'dark:text-rose-300', 'border-rose-300', 'dark:border-rose-800');
+    } else if (trend.trend_status === 'improved' || trend.trend_status === 'stable') {
+      badgeTrend.classList.add('bg-emerald-50', 'dark:bg-emerald-950/50', 'text-emerald-700', 'dark:text-emerald-300', 'border-emerald-300', 'dark:border-emerald-800');
+    } else {
+      badgeTrend.classList.add('bg-zinc-100', 'dark:bg-zinc-800', 'text-zinc-700', 'dark:text-zinc-300', 'border-zinc-200', 'dark:border-zinc-700');
+    }
+  }
+
+  if (snapshots.length === 0) {
+    container.innerHTML = `
+      <div class="p-3 text-center text-zinc-500 dark:text-zinc-400 text-xs bg-zinc-50 dark:bg-zinc-850 rounded border border-zinc-200 dark:border-zinc-800">
+        ${currentLang === 'en' 
+          ? 'No local snapshots recorded yet. Telemetry snapshots will be stored automatically as you monitor this drive.'
+          : 'Belum ada riwayat tercatat untuk disk ini. Snapshot tersimpan otomatis setiap pembacaan telemetri.'}
+      </div>`;
+    return;
+  }
+
+  const recentSnapshots = [...snapshots].reverse().slice(0, 10);
+  const rows = recentSnapshots.map(s => {
+    let dateFormatted = s.timestamp;
+    try {
+      const d = new Date(s.timestamp);
+      dateFormatted = d.toLocaleString();
+    } catch (_) {}
+
+    const hDisplay = s.health === null ? 'N/A' : `${s.health}%`;
+    const tDisplay = s.temperature === null ? 'N/A' : `${s.temperature} °C`;
+    const statusLabel = currentLang === 'en' ? (s.status_label_en || 'Unknown') : (s.status_label_id || 'Tidak Diketahui');
+
+    return `
+      <tr>
+        <td class="text-zinc-600 dark:text-zinc-400">${escapeHtml(dateFormatted)}</td>
+        <td class="font-bold ${s.health !== null && s.health < 80 ? 'text-rose-600 dark:text-rose-400' : 'text-zinc-900 dark:text-zinc-100'}">${hDisplay}</td>
+        <td class="text-zinc-700 dark:text-zinc-300">${tDisplay}</td>
+        <td class="text-zinc-500">${escapeHtml(s.data_source || 'unknown')}</td>
+        <td><span class="px-1.5 py-0.2 rounded text-[10px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">${escapeHtml(statusLabel)}</span></td>
+      </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>${currentLang === 'en' ? 'Timestamp' : 'Waktu'}</th>
+            <th>${currentLang === 'en' ? 'True Health' : 'Kesehatan'}</th>
+            <th>${currentLang === 'en' ? 'Temp' : 'Suhu'}</th>
+            <th>${currentLang === 'en' ? 'Source' : 'Sumber'}</th>
+            <th>${currentLang === 'en' ? 'Status' : 'Kondisi'}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+    <div class="flex justify-between items-center text-[10px] text-zinc-400 px-1 pt-0.5">
+      <span>${currentLang === 'en' ? `Showing ${recentSnapshots.length} of ${snapshots.length} recorded snapshots (max 30)` : `Menampilkan ${recentSnapshots.length} dari ${snapshots.length} snapshot tersimpan (maks. 30)`}</span>
+    </div>
+  `;
+}
+
+function promptClearHistory() {
+  if (!allDisks || allDisks.length === 0) return;
+  const disk = allDisks[activeDiskIndex];
+  if (!disk || !disk.disk_id) return;
+
+  const msg = currentLang === 'en'
+    ? `Are you sure you want to clear health history for "${disk.name}"?`
+    : `Apakah Anda yakin ingin menghapus seluruh riwayat kesehatan untuk "${disk.name}"?`;
+
+  if (!confirm(msg)) return;
+
+  apiFetch('/api/history/clear', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ disk_id: disk.disk_id }),
+  })
+    .then(res => {
+      if (res && res.success) {
+        showToast(currentLang === 'en' ? 'Health history cleared.' : 'Riwayat kesehatan berhasil dihapus.', 'success');
+        refreshData();
+      } else {
+        showToast(currentLang === 'en' ? 'Failed to clear history.' : 'Gagal menghapus riwayat.', 'error');
+      }
+    })
+    .catch(err => {
+      showToast(String(err), 'error');
+    });
+}
+
+// ==============================================================================
+// ONBOARDING & WELCOME GUIDE CONTROLLER
+// ==============================================================================
+function openOnboardingModal(userInitiated = false) {
+  const modal = document.getElementById('onboarding-modal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+
+  const btnId = document.getElementById('btn-onboarding-lang-id');
+  const btnEn = document.getElementById('btn-onboarding-lang-en');
+  if (btnId) btnId.classList.toggle('is-active', currentLang === 'id');
+  if (btnEn) btnEn.classList.toggle('is-active', currentLang === 'en');
+
+  safeCreateIcons();
+}
+
+function closeOnboardingModal() {
+  const modal = document.getElementById('onboarding-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function completeOnboarding() {
+  try {
+    localStorage.setItem('diagnose_onboarded', 'true');
+  } catch (e) {
+    console.warn('LocalStorage error:', e);
+  }
+  closeOnboardingModal();
+  showToast(currentLang === 'en' ? 'Welcome to DiagnoseMyDisk! Ready.' : 'Selamat datang di DiagnoseMyDisk! Siap digunakan.', 'success');
 }

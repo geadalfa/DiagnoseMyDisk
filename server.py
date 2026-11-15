@@ -57,12 +57,51 @@ try:
     from backend import updater
 except ImportError:
     import updater
+try:
+    from backend import history_manager
+except ImportError:
+    import history_manager
 
 PORT = 5550
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-APP_VERSION = "3.3.0"
+APP_VERSION = "3.4.0"
 APP_TOKEN = secrets.token_urlsafe(32)
 MAX_BODY_BYTES = 1024 * 1024
+
+def get_disk_identifier(disk: dict) -> str:
+    serial = str(disk.get("serial_number") or "").strip()
+    if serial and serial.lower() not in ("none", "unknown", ""):
+        return serial
+    model = str(disk.get("model") or disk.get("name") or "Disk").strip()
+    idx = disk.get("index", 0)
+    return f"{model}_{idx}"
+
+def enrich_and_record_history(disks):
+    if not isinstance(disks, list):
+        return
+    hm = history_manager.get_history_manager()
+    for d in disks:
+        if not isinstance(d, dict):
+            continue
+        disk_id = get_disk_identifier(d)
+        d["disk_id"] = disk_id
+        model = str(d.get("model") or d.get("name") or "Disk").strip()
+        ha = d.get("health_analysis") or {}
+        health = ha.get("true_health")
+        temp = d.get("temperature_c")
+        source = d.get("data_source") or "unknown"
+        status_en = ha.get("status_label_en") or "Unknown"
+        status_id = ha.get("status_label_id") or "Tidak Diketahui"
+        hm.record_snapshot(
+            disk_id=disk_id,
+            disk_name=model,
+            health=health,
+            temperature=temp,
+            data_source=source,
+            status_label_en=status_en,
+            status_label_id=status_id,
+        )
+        d["health_trend"] = hm.get_disk_trend(disk_id)
 LOCAL_HOSTNAMES = {"127.0.0.1", "localhost"}
 DRIVE_TARGET_RE = re.compile(r"^[A-Za-z](?::[\\/]?|[\\/])?$")
 
@@ -361,10 +400,20 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
 
         elif parsed_path.path == "/api/update/download":
             try:
-                url = body_data.get("download_url") if isinstance(body_data, dict) else None
-                self._send_json(updater_instance.start_download(url))
+                # Custom URLs are ignored to enforce official release integrity
+                self._send_json(updater_instance.start_download())
             except Exception as e:
                 self._send_json({"status": "error", "error": str(e)}, status=500)
+            return
+
+        elif parsed_path.path == "/api/history/clear":
+            try:
+                hm = history_manager.get_history_manager()
+                disk_id = body_data.get("disk_id") if isinstance(body_data, dict) else None
+                ok = hm.clear_history(disk_id=disk_id)
+                self._send_json({"success": ok, "message": "Riwayat kesehatan berhasil dihapus."})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
             return
 
         elif parsed_path.path == "/api/update/apply":
@@ -472,6 +521,18 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
             self._send_json({"success": True, "glossary": get_flash_technology_glossary()})
             return
 
+        elif parsed_path.path == "/api/history":
+            try:
+                hm = history_manager.get_history_manager()
+                disk_id = qs.get("disk_id", [None])[0]
+                if disk_id:
+                    self._send_json({"success": True, "trend": hm.get_disk_trend(disk_id), "disk_id": disk_id})
+                else:
+                    self._send_json({"success": True, "history": hm.get_history()})
+            except Exception as e:
+                self._send_json({"success": False, "error": str(e)}, status=500)
+            return
+
         elif parsed_path.path == "/api/disks":
             try:
                 if cached_disks_data is None:
@@ -481,6 +542,8 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                     if not cached_disks_data:
                         cached_disks_data = collect_all_disks_data()
                     data_to_send = cached_disks_data
+
+                enrich_and_record_history(data_to_send)
 
                 resp = {
                     "success": True,
@@ -500,13 +563,15 @@ class DiagnoseDiskHandler(SimpleHTTPRequestHandler):
                 with cache_lock:
                     if new_data:
                         cached_disks_data = new_data
+                data_to_send = cached_disks_data or new_data
+                enrich_and_record_history(data_to_send)
 
                 resp = {
                     "success": True,
                     "version": APP_VERSION,
                     "refreshed": True,
                     "is_admin": is_admin(),
-                    "disks": cached_disks_data or new_data,
+                    "disks": data_to_send,
                     "glossary": get_flash_technology_glossary(),
                 }
                 self._send_json(resp)

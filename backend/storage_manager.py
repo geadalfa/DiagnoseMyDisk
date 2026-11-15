@@ -316,7 +316,16 @@ class StorageManager:
                         target_drives.extend(matched)
 
             if not target_drives:
-                target_drives = all_drives[:1]
+                with self.lock:
+                    self.is_scanning = False
+                    self.status_code = "error"
+                    if drive_letters and "all" not in drive_letters:
+                        requested_str = ", ".join(str(x) for x in drive_letters)
+                        self.status_text = f"Target drive tidak ditemukan atau tidak tersedia: {requested_str}"
+                    else:
+                        self.status_text = "Tidak ada drive penyimpanan yang tersedia untuk dipindai."
+                app_logger.log_error("StorageManager", self.status_text)
+                return
 
             total_target_used = sum(d["used"] for d in target_drives)
             total_target_size = sum(d["total"] for d in target_drives)

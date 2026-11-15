@@ -108,6 +108,92 @@ class TestUpdateManager(unittest.TestCase):
         self.assertIn("auto_update", prefs)
         self.assertTrue(prefs["auto_update"])
 
+    def test_download_rejects_non_https(self):
+        self.mgr.latest_release_info = {
+            "download_url": "http://insecure.example.com/setup.exe",
+            "setup_filename": "setup.exe",
+            "download_size": 1000,
+        }
+        res = self.mgr.start_download()
+        self.assertEqual(res["status"], "error")
+        self.assertIn("HTTPS", res["error"])
+
+    def test_apply_update_refuses_unverified_installer(self):
+        self.mgr.installer_path = "non_existent.exe"
+        self.mgr.hash_verified = False
+        res = self.mgr.apply_update()
+        self.assertFalse(res["success"])
+        self.assertIn("error", res)
+
+    @patch("urllib.request.urlopen")
+    def test_download_verifies_valid_sha256(self, mock_urlopen):
+        import hashlib
+        fake_binary = b"MZ-test-installer-binary-payload"
+        valid_sha256 = hashlib.sha256(fake_binary).hexdigest()
+
+        self.mgr.latest_release_info = {
+            "download_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk_Setup.exe",
+            "checksum_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/SHA256SUMS.txt",
+            "setup_filename": "DiagnoseMyDisk_Setup.exe",
+            "download_size": len(fake_binary),
+        }
+
+        # Mock first call (checksum) and second call (binary download)
+        mock_chk_resp = MagicMock()
+        mock_chk_resp.read.return_value = f"{valid_sha256}  DiagnoseMyDisk_Setup.exe\n".encode("utf-8")
+        mock_chk_resp.__enter__.return_value = mock_chk_resp
+
+        mock_bin_resp = MagicMock()
+        mock_bin_resp.headers = {"Content-Length": str(len(fake_binary))}
+        mock_bin_resp.read.side_effect = [fake_binary, b""]
+        mock_bin_resp.__enter__.return_value = mock_bin_resp
+
+        mock_urlopen.side_effect = [mock_chk_resp, mock_bin_resp]
+
+        self.mgr.start_download()
+        if self.mgr._download_thread:
+            self.mgr._download_thread.join(timeout=3.0)
+
+        self.assertEqual(self.mgr.status, "ready_to_install")
+        self.assertTrue(self.mgr.hash_verified)
+        self.assertEqual(self.mgr.downloaded_hash, valid_sha256)
+        if self.mgr.installer_path and os.path.exists(self.mgr.installer_path):
+            try:
+                os.remove(self.mgr.installer_path)
+            except Exception:
+                pass
+
+    @patch("urllib.request.urlopen")
+    def test_download_fails_on_sha256_mismatch(self, mock_urlopen):
+        fake_binary = b"MZ-corrupted-binary-payload"
+        mismatch_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+
+        self.mgr.latest_release_info = {
+            "download_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk_Setup.exe",
+            "checksum_url": "https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/SHA256SUMS.txt",
+            "setup_filename": "DiagnoseMyDisk_Setup.exe",
+            "download_size": len(fake_binary),
+        }
+
+        mock_chk_resp = MagicMock()
+        mock_chk_resp.read.return_value = f"{mismatch_sha256}  DiagnoseMyDisk_Setup.exe\n".encode("utf-8")
+        mock_chk_resp.__enter__.return_value = mock_chk_resp
+
+        mock_bin_resp = MagicMock()
+        mock_bin_resp.headers = {"Content-Length": str(len(fake_binary))}
+        mock_bin_resp.read.side_effect = [fake_binary, b""]
+        mock_bin_resp.__enter__.return_value = mock_bin_resp
+
+        mock_urlopen.side_effect = [mock_chk_resp, mock_bin_resp]
+
+        self.mgr.start_download()
+        if self.mgr._download_thread:
+            self.mgr._download_thread.join(timeout=3.0)
+
+        self.assertEqual(self.mgr.status, "error")
+        self.assertFalse(self.mgr.hash_verified)
+        self.assertIn("Integritas installer gagal", self.mgr.error_message)
+
 
 if __name__ == "__main__":
     unittest.main()

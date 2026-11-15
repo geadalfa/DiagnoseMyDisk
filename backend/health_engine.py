@@ -491,13 +491,17 @@ def calculate_hdd_health(attributes, power_on_hours=0, temperature=None, data_so
     if spin_retry > 0:
         penalty += min(15.0, spin_retry * 3.0)
 
+    has_sector_telemetry = any(aid in attr_map for aid in (0x05, 0xC5, 0xC6))
+
     true_health = None
-    if attributes:
+    if attributes and has_sector_telemetry:
         true_health = int(max(1, min(100, round(100 - penalty))))
 
     data_gaps = []
     if not attributes:
         data_gaps.append("raw S.M.A.R.T attribute table")
+    elif not has_sector_telemetry:
+        data_gaps.append("sector health attributes (0x05, 0xC5, 0xC6)")
     if power_on_hours <= 0:
         data_gaps.append("Power-On Hours")
     if temp_value is None:
@@ -528,13 +532,21 @@ def calculate_hdd_health(attributes, power_on_hours=0, temperature=None, data_so
             "desc_en": f"Reallocated {reallocated:,}, Pending {pending:,}, Uncorrectable {uncorrectable:,}. Back up important data now.",
             "severity": "danger",
         })
-    elif attributes:
+    elif has_sector_telemetry:
         layman_factors.append({
             "title_id": "Permukaan Piringan Bersih",
             "title_en": "Clean Platter Surface",
             "desc_id": "Tidak ada sektor reallocated, pending, maupun uncorrectable pada pembacaan ini.",
             "desc_en": "No reallocated, pending, or uncorrectable sectors were reported in this read.",
             "severity": "success",
+        })
+    elif attributes:
+        layman_factors.append({
+            "title_id": "Telemetri Sektor Tidak Ditemukan",
+            "title_en": "Sector Telemetry Not Available",
+            "desc_id": "Atribut kesehatan sektor (0x05, 0xC5, 0xC6) tidak dilaporkan oleh disk/driver ini. Status kesehatan ditandai N/A.",
+            "desc_en": "Sector health attributes (0x05, 0xC5, 0xC6) were not reported by this disk/driver. Health is marked N/A.",
+            "severity": "info",
         })
     if crc_errors > 0:
         layman_factors.append({

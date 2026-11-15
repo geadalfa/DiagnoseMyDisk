@@ -13,13 +13,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Version-v3.2.0-emerald.svg?logo=github&logoColor=white" alt="Version v3.2.0"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/releases"><img src="https://img.shields.io/badge/Version-v3.4.0-emerald.svg?logo=github&logoColor=white" alt="Version v3.4.0"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078d4.svg?logo=windows&logoColor=white" alt="Platform Windows"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-%E2%89%A5%203.9-3776AB.svg?logo=python&logoColor=white" alt="Python Version"></a>
   <a href="#-privacy-guarantee-we-do-not-collect-data"><img src="https://img.shields.io/badge/Privacy-100%25%20UU%20PDP%20Compliant-blue.svg?logo=shield&logoColor=white" alt="UU PDP Compliant"></a>
   <a href="#-privacy-guarantee-we-do-not-collect-data"><img src="https://img.shields.io/badge/Zero--Telemetry-No%20Data%20Collected-10b981.svg" alt="Zero Telemetry"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-CC%20BY--NC%204.0%20(Non--Commercial)-lightgrey.svg" alt="License: CC BY-NC 4.0"></a>
-  <a href="https://github.com/geadalfa/DiagnoseMyDisk/tree/main/tests"><img src="https://img.shields.io/badge/Tests-52%20passing-10b981.svg" alt="52 tests passing"></a>
+  <a href="https://github.com/geadalfa/DiagnoseMyDisk/tree/main/tests"><img src="https://img.shields.io/badge/Tests-85%20passing-10b981.svg" alt="85 tests passing"></a>
   <a href="#security-model-v300"><img src="https://img.shields.io/badge/API-127.0.0.1%20only-2563EB.svg" alt="Local API only"></a>
 </p>
 
@@ -51,6 +51,19 @@ A drive can report `Current = 100` while its raw registers show worn NAND cells,
 
 ---
 
+## v3.4.0 Highlights — Trustworthy First-Run & Forensic Hardening
+
+| Area | v3.4.0 Improvement |
+| :--- | :--- |
+| **First-Run Onboarding** | Interactive bilingual onboarding walkthrough explaining 100% offline telemetry, distinguishing read-only diagnosis from guarded repair operations. Reopenable anytime via Help & Guide in the sidebar. |
+| **Recommended Actions Panel** | Dynamic contextual guidance cards ("Apa yang perlu dilakukan?") advising on backups, forensic S.M.A.R.T inspection, or surface scanning based on current disk telemetry. |
+| **Local Health History & Trends** | Durable local snapshot recording (max 30 snapshots per disk) with atomic writes and corruption recovery. Computes trend diffs without speculating drive lifespan. Includes history clearance and trend summaries in exported reports. |
+| **Hardened Auto-Updater** | Zero-trust release downloader validating SHA-256 against official `SHA256SUMS.txt`, enforcing HTTPS and download size limits, ignoring arbitrary caller URLs, and requiring verified integrity before launch. |
+| **Honest Diagnostic Statuses** | Filesystem repair timeouts report failure honestly instead of masking as success; `fsutil` return codes are audited; missing requested storage drives fail honestly without scanning random drives; and mechanical HDDs require verified sector attributes before scoring health. |
+| **Responsive Sidebar & A11y** | Optimized collapsed layout at viewport ≤1180px with accessible tooltips, unclipped preferences toggles, and unified bilingual ARIA names. |
+
+---
+
 ## v3.2.0 Highlights
 
 | Area | v3.2.0 |
@@ -70,7 +83,7 @@ A drive can report `Current = 100` while its raw registers show worn NAND cells,
 | **Data honesty** | Source labels · data-gap lists · `N/A` for missing values · no fabricated temperatures, POH, NVMe counters, or health percentages |
 | **Storage** | Measured category breakdown · duplicate hashing budgets · scan caps · reload-safe watchdog · Shell-based Recycle Bin cleanup |
 | **UI** | Sidebar shell · context topbar · health ring · summary-only hero · 40-column LBA map · fixed storage wiring · diagnostic HTML export · keyboard focus |
-| **Quality** | 52 automated tests · security regression tests · performance guardrails · real-hardware browser QA |
+| **Quality** | 85 automated tests · security regression tests · performance guardrails · real-hardware browser QA |
 
 ---
 
@@ -84,7 +97,7 @@ Measured on the author's Windows 11 workstation (4 physical drives: NVMe, 2× SA
 | Duplicate analysis | **131 duplicate groups** identified |
 | Recommendations / large items / old items | 10 / 150 / 150 |
 | Cached telemetry API latency | **~1.1 ms average** (5-run local benchmark) |
-| Test suite | **52/52 passing** (unit, integration, security, performance) |
+| Test suite | **85/85 passing** (unit, integration, security, performance) |
 | Browser QA | 4 disks, 30 S.M.A.R.T rows, 200 surface blocks, folder expansion, filters, duplicate selection, logs, export, language/theme, reload survival |
 | Network audit | Every request stayed on `127.0.0.1` |
 
@@ -106,15 +119,15 @@ These are reproducible checks, not marketing estimates. Hardware readings vary b
 
 ---
 
-## Download & Install (v3.2.0)
+## Download & Install (v3.4.0)
 
 Standalone executables for Windows 10 & 11 (64-bit):
 
 | Distribution Package | Description | Direct Download |
 | :--- | :--- | :--- |
-| **Windows Installer (.EXE)** *(Recommended)* | Automated installation to local AppData, Start Menu and optional desktop shortcut. Runs without installer-time Administrator rights. | [**Download DiagnoseMyDisk_Setup.exe (v3.2.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.2.0/DiagnoseMyDisk_Setup.exe) |
-| **Portable Archive (.ZIP)** | Standalone portable bundle. Extract and run `DiagnoseMyDisk.exe` without installation. | [**Download DiagnoseMyDisk-v3.2.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.2.0/DiagnoseMyDisk-v3.2.0-portable.zip) |
-| **Checksums** | SHA-256 for both release assets. Verify before running. | [**Download SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.2.0/SHA256SUMS.txt) |
+| **Windows Installer (.EXE)** *(Recommended)* | Automated installation to local AppData, Start Menu and optional desktop shortcut. Runs without installer-time Administrator rights. | [**Download DiagnoseMyDisk_Setup.exe (v3.4.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk_Setup.exe) |
+| **Portable Archive (.ZIP)** | Standalone portable bundle. Extract and run `DiagnoseMyDisk.exe` without installation. | [**Download DiagnoseMyDisk-v3.4.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk-v3.4.0-portable.zip) |
+| **Checksums** | SHA-256 for both release assets. Verify before running. | [**Download SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/SHA256SUMS.txt) |
 
 ```text
 f31331fd387adae66ba45962741db7822f5a5e796359139f9a34907b9245bc14  DiagnoseMyDisk_Setup.exe
@@ -326,7 +339,7 @@ iscc installer.iss
 ```powershell
 python -m unittest discover tests
 ```
-*All 52 test suites must pass with exit code 0.*
+*All 85 test suites must pass with exit code 0.*
 
 ---
 
@@ -453,21 +466,21 @@ Drive bisa melaporkan `Current = 100` sementara register mentahnya menunjukkan s
 | **Telemetri berbasis bukti** | Label `LIVE WMI` / `CDI CACHE` / `UNAVAILABLE`, daftar data gap, dan `N/A` untuk nilai yang tidak terbaca. |
 | **Penyimpanan terukur** | Kategori memakai byte yang benar-benar dipindai; kapasitas belum terpindai diberi label sendiri, bukan estimasi palsu. |
 | **UI storage diperbaiki** | Filter, badge, pemilihan rekomendasi, folder inspection, export laporan HTML, dan empty/loading state bekerja konsisten. |
-| **Kualitas terverifikasi** | 52 test otomatis, security regression test, performance guardrail, dan QA browser pada hardware nyata. |
+| **Kualitas terverifikasi** | 85 test otomatis, security regression test, performance guardrail, dan QA browser pada hardware nyata. |
 
 **Hasil uji nyata:** scan `C:` 24.106 file dalam ~16 detik, 131 grup duplikat, 10 rekomendasi, dan latensi API cache ~1,1 ms. Semua trafik tetap di `127.0.0.1`.
 
 ---
 
-## Unduh & Pasang Sekarang (v3.2.0)
+## Unduh & Pasang Sekarang (v3.4.0)
 
 Tersedia versi siap pakai untuk Windows 10 & 11 (64-bit):
 
 | Paket Rilis | Deskripsi | Tautan Unduhan Langsung |
 | :--- | :--- | :--- |
-| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke local AppData, Start Menu, dan shortcut desktop opsional. Tanpa hak Administrator saat instalasi. | [**Unduh DiagnoseMyDisk_Setup.exe (v3.2.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.2.0/DiagnoseMyDisk_Setup.exe) |
-| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v3.2.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.2.0/DiagnoseMyDisk-v3.2.0-portable.zip) |
-| **Checksum** | SHA-256 untuk kedua aset rilis. Verifikasi sebelum menjalankan. | [**Unduh SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.2.0/SHA256SUMS.txt) |
+| **Windows Installer Setup** *(Rekomendasi)* | Pemasangan otomatis ke local AppData, Start Menu, dan shortcut desktop opsional. Tanpa hak Administrator saat instalasi. | [**Unduh DiagnoseMyDisk_Setup.exe (v3.4.0)**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk_Setup.exe) |
+| **Versi Portabel (.ZIP)** | Format portabel mandiri tanpa instalasi. Cukup ekstrak dan jalankan `DiagnoseMyDisk.exe`. | [**Unduh DiagnoseMyDisk-v3.4.0-portable.zip**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/DiagnoseMyDisk-v3.4.0-portable.zip) |
+| **Checksum** | SHA-256 untuk kedua aset rilis. Verifikasi sebelum menjalankan. | [**Unduh SHA256SUMS.txt**](https://github.com/geadalfa/DiagnoseMyDisk/releases/download/v3.4.0/SHA256SUMS.txt) |
 
 Seluruh rilis lengkap dan catatan perubahan dapat diakses di [GitHub Releases](https://github.com/geadalfa/DiagnoseMyDisk/releases). Aplikasi memerlukan Windows 10/11 x64 dan membuka jendela Edge/Chrome khusus pada `127.0.0.1:5550`.
 
@@ -632,7 +645,7 @@ iscc installer.iss
 ```powershell
 python -m unittest discover tests
 ```
-*Seluruh 52 test suite wajib lulus (Exit Code 0).*
+*Seluruh 85 test suite wajib lulus (Exit Code 0).*
 
 ---
 
